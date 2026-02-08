@@ -1,0 +1,49 @@
+{
+  "name": "voice-ai-sdk",
+  "version": "0.1.0",
+  "description": "Unified Voice AI SDK — one interface for multiple voice AI providers",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "keywords": [
+    "voice",
+    "ai",
+    "sdk",
+    "vapi",
+    "retell",
+    "phone",
+    "telephony"
+  ],
+  "dependencies": {
+    "@vapi-ai/server-sdk": "^0.11.0",
+    "retell-sdk": "^4.66.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
