@@ -23,6 +23,11 @@ const agent = await vapi.agents.create({
   voice: { voiceId: 'jennifer' },
   model: { provider: 'openai', model: 'gpt-4', systemPrompt: 'You are a helpful assistant.' },
   firstMessage: 'Hello, how can I help you?',
+  maxDurationSeconds: 300,
+  backgroundSound: 'office',
+  voicemailMessage: 'Sorry we missed you. Leave a message after the beep.',
+  webhookUrl: 'https://example.com/webhook',
+  webhookTimeoutSeconds: 20,
 });
 
 // Make an outbound call

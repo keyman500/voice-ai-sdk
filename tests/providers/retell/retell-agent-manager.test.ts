@@ -40,13 +40,31 @@ describe('RetellAgentManager', () => {
       const agent = await provider.agents.create({
         name: 'Test',
         voice: { voiceId: 'emma' },
+        maxDurationSeconds: 300,
+        backgroundSound: 'coffee-shop',
+        voicemailMessage: 'Please leave a message.',
+        webhookUrl: 'https://example.com/webhook',
+        webhookTimeoutSeconds: 12,
       });
 
       expect(agent.id).toBe('agent_1');
       expect(agent.provider).toBe('retell');
       expect(agent.name).toBe('Test');
       expect(mockAgent.create).toHaveBeenCalledWith(
-        expect.objectContaining({ agent_name: 'Test', voice_id: 'emma' }),
+        expect.objectContaining({
+          agent_name: 'Test',
+          voice_id: 'emma',
+          max_call_duration_ms: 300000,
+          ambient_sound: 'coffee-shop',
+          webhook_url: 'https://example.com/webhook',
+          webhook_timeout_ms: 12000,
+          voicemail_option: {
+            action: {
+              type: 'static_text',
+              text: 'Please leave a message.',
+            },
+          },
+        }),
       );
     });
 
@@ -113,11 +131,30 @@ describe('RetellAgentManager', () => {
       mockAgent.update.mockResolvedValue(updated);
       const provider = createRetell({ apiKey: 'test-key' });
 
-      const agent = await provider.agents.update('agent_1', { name: 'Updated' });
+      const agent = await provider.agents.update('agent_1', {
+        name: 'Updated',
+        maxDurationSeconds: 60,
+        backgroundSound: 'static-noise',
+        voicemailMessage: 'Bye.',
+        webhookUrl: 'https://example.com/wh',
+        webhookTimeoutSeconds: 9,
+      });
       expect(agent.name).toBe('Updated');
       expect(mockAgent.update).toHaveBeenCalledWith(
         'agent_1',
-        expect.objectContaining({ agent_name: 'Updated' }),
+        expect.objectContaining({
+          agent_name: 'Updated',
+          max_call_duration_ms: 60000,
+          ambient_sound: 'static-noise',
+          webhook_url: 'https://example.com/wh',
+          webhook_timeout_ms: 9000,
+          voicemail_option: {
+            action: {
+              type: 'static_text',
+              text: 'Bye.',
+            },
+          },
+        }),
       );
     });
   });

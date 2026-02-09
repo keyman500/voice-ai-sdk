@@ -60,11 +60,23 @@ describe('Vapi Mappers', () => {
         model: { provider: 'openai', model: 'gpt-4', systemPrompt: 'Be nice.' },
         firstMessage: 'Hi there',
         metadata: { foo: 'bar' },
+        maxDurationSeconds: 300,
+        backgroundSound: 'office',
+        voicemailMessage: 'Please leave a message.',
+        webhookUrl: 'https://example.com/webhook',
+        webhookTimeoutSeconds: 25,
       });
 
       expect(result.name).toBe('My Agent');
       expect(result.firstMessage).toBe('Hi there');
       expect(result.metadata).toEqual({ foo: 'bar' });
+      expect(result.maxDurationSeconds).toBe(300);
+      expect(result.backgroundSound).toBe('office');
+      expect(result.voicemailMessage).toBe('Please leave a message.');
+      expect(result.server).toEqual({
+        url: 'https://example.com/webhook',
+        timeoutSeconds: 25,
+      });
       expect(result.voice).toEqual({ voiceId: 'rachel', provider: '11labs' });
       expect(result.model).toEqual({
         provider: 'openai',
@@ -82,6 +94,22 @@ describe('Vapi Mappers', () => {
       expect(result.endCallMessage).toBe('Bye');
     });
 
+    it('merges providerOptions.server with canonical webhook fields', () => {
+      const result = mapCreateAgentToVapi({
+        webhookUrl: 'https://example.com/webhook',
+        webhookTimeoutSeconds: 20,
+        providerOptions: {
+          server: { url: 'https://override.example.com', headers: { 'x-test': '1' } },
+        },
+      });
+
+      expect(result.server).toEqual({
+        url: 'https://override.example.com',
+        timeoutSeconds: 20,
+        headers: { 'x-test': '1' },
+      });
+    });
+
     it('handles empty params', () => {
       const result = mapCreateAgentToVapi({});
       expect(Object.keys(result)).toHaveLength(0);
@@ -93,6 +121,24 @@ describe('Vapi Mappers', () => {
       const result = mapUpdateAgentToVapi('asst_1', { name: 'Updated' });
       expect(result.id).toBe('asst_1');
       expect(result.name).toBe('Updated');
+    });
+
+    it('maps overlapping fields on update', () => {
+      const result = mapUpdateAgentToVapi('asst_1', {
+        maxDurationSeconds: 120,
+        backgroundSound: 'off',
+        voicemailMessage: 'Bye.',
+        webhookUrl: 'https://example.com/wh',
+        webhookTimeoutSeconds: 10,
+      });
+
+      expect(result.maxDurationSeconds).toBe(120);
+      expect(result.backgroundSound).toBe('off');
+      expect(result.voicemailMessage).toBe('Bye.');
+      expect(result.server).toEqual({
+        url: 'https://example.com/wh',
+        timeoutSeconds: 10,
+      });
     });
   });
 

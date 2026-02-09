@@ -64,6 +64,11 @@ describe('Retell Mappers', () => {
         voice: { voiceId: 'emma' },
         model: { provider: 'retell-llm', model: 'llm_123' },
         firstMessage: 'Hello!',
+        maxDurationSeconds: 300,
+        backgroundSound: 'coffee-shop',
+        voicemailMessage: 'Please leave a message.',
+        webhookUrl: 'https://example.com/webhook',
+        webhookTimeoutSeconds: 12,
       });
 
       expect(result.agent_name).toBe('My Agent');
@@ -73,6 +78,16 @@ describe('Retell Mappers', () => {
         llm_id: 'llm_123',
       });
       expect(result.begin_message).toBe('Hello!');
+      expect(result.max_call_duration_ms).toBe(300000);
+      expect(result.ambient_sound).toBe('coffee-shop');
+      expect(result.webhook_url).toBe('https://example.com/webhook');
+      expect(result.webhook_timeout_ms).toBe(12000);
+      expect(result.voicemail_option).toEqual({
+        action: {
+          type: 'static_text',
+          text: 'Please leave a message.',
+        },
+      });
     });
 
     it('passes through providerOptions', () => {
@@ -94,6 +109,27 @@ describe('Retell Mappers', () => {
     it('maps update params to Retell format', () => {
       const result = mapUpdateAgentToRetell({ name: 'Updated' });
       expect(result.agent_name).toBe('Updated');
+    });
+
+    it('maps overlapping fields on update', () => {
+      const result = mapUpdateAgentToRetell({
+        maxDurationSeconds: 60,
+        backgroundSound: 'static-noise',
+        voicemailMessage: 'Bye.',
+        webhookUrl: 'https://example.com/wh',
+        webhookTimeoutSeconds: 9,
+      });
+
+      expect(result.max_call_duration_ms).toBe(60000);
+      expect(result.ambient_sound).toBe('static-noise');
+      expect(result.webhook_url).toBe('https://example.com/wh');
+      expect(result.webhook_timeout_ms).toBe(9000);
+      expect(result.voicemail_option).toEqual({
+        action: {
+          type: 'static_text',
+          text: 'Bye.',
+        },
+      });
     });
   });
 

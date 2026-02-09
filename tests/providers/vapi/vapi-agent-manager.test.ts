@@ -43,13 +43,27 @@ describe('VapiAgentManager', () => {
         name: 'Test',
         voice: { voiceId: 'rachel', provider: '11labs' },
         model: { provider: 'openai', model: 'gpt-4' },
+        maxDurationSeconds: 300,
+        backgroundSound: 'office',
+        voicemailMessage: 'Please leave a message.',
+        webhookUrl: 'https://example.com/webhook',
+        webhookTimeoutSeconds: 25,
       });
 
       expect(agent.id).toBe('asst_1');
       expect(agent.provider).toBe('vapi');
       expect(agent.name).toBe('Test');
       expect(mockAssistants.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Test' }),
+        expect.objectContaining({
+          name: 'Test',
+          maxDurationSeconds: 300,
+          backgroundSound: 'office',
+          voicemailMessage: 'Please leave a message.',
+          server: {
+            url: 'https://example.com/webhook',
+            timeoutSeconds: 25,
+          },
+        }),
       );
     });
 
@@ -118,10 +132,27 @@ describe('VapiAgentManager', () => {
       mockAssistants.update.mockResolvedValue(updated);
       const provider = createVapi({ apiKey: 'test-key' });
 
-      const agent = await provider.agents.update('asst_1', { name: 'Updated' });
+      const agent = await provider.agents.update('asst_1', {
+        name: 'Updated',
+        maxDurationSeconds: 120,
+        backgroundSound: 'off',
+        voicemailMessage: 'Bye.',
+        webhookUrl: 'https://example.com/wh',
+        webhookTimeoutSeconds: 10,
+      });
       expect(agent.name).toBe('Updated');
       expect(mockAssistants.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'asst_1', name: 'Updated' }),
+        expect.objectContaining({
+          id: 'asst_1',
+          name: 'Updated',
+          maxDurationSeconds: 120,
+          backgroundSound: 'off',
+          voicemailMessage: 'Bye.',
+          server: {
+            url: 'https://example.com/wh',
+            timeoutSeconds: 10,
+          },
+        }),
       );
     });
   });

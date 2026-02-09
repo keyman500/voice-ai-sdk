@@ -57,6 +57,20 @@ export function mapCreateAgentToRetell(
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
   if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined)
+    dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
+  if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
+  if (params.webhookUrl !== undefined) dto.webhook_url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    dto.webhook_timeout_ms = params.webhookTimeoutSeconds * 1000;
+  if (params.voicemailMessage !== undefined) {
+    dto.voicemail_option = {
+      action: {
+        type: 'static_text',
+        text: params.voicemailMessage,
+      },
+    };
+  }
   if (params.model) {
     dto.response_engine = {
       type: params.model.provider,
@@ -76,6 +90,20 @@ export function mapUpdateAgentToRetell(
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
   if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined)
+    dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
+  if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
+  if (params.webhookUrl !== undefined) dto.webhook_url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    dto.webhook_timeout_ms = params.webhookTimeoutSeconds * 1000;
+  if (params.voicemailMessage !== undefined) {
+    dto.voicemail_option = {
+      action: {
+        type: 'static_text',
+        text: params.voicemailMessage,
+      },
+    };
+  }
   if (params.model) {
     dto.response_engine = {
       type: params.model.provider,

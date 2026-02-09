@@ -54,6 +54,14 @@ export function mapCreateAgentToVapi(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.name = params.name;
   if (params.firstMessage !== undefined) dto.firstMessage = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined) dto.maxDurationSeconds = params.maxDurationSeconds;
+  if (params.backgroundSound !== undefined) dto.backgroundSound = params.backgroundSound;
+  if (params.voicemailMessage !== undefined) dto.voicemailMessage = params.voicemailMessage;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    server.timeoutSeconds = params.webhookTimeoutSeconds;
+  if (Object.keys(server).length > 0) dto.server = server;
   if (params.metadata !== undefined) dto.metadata = params.metadata;
   if (params.voice) {
     dto.voice = {
@@ -71,7 +79,13 @@ export function mapCreateAgentToVapi(
     };
   }
   if (params.providerOptions) {
-    Object.assign(dto, params.providerOptions);
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
   }
   return dto;
 }
@@ -83,6 +97,14 @@ export function mapUpdateAgentToVapi(
   const dto: Record<string, unknown> = { id };
   if (params.name !== undefined) dto.name = params.name;
   if (params.firstMessage !== undefined) dto.firstMessage = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined) dto.maxDurationSeconds = params.maxDurationSeconds;
+  if (params.backgroundSound !== undefined) dto.backgroundSound = params.backgroundSound;
+  if (params.voicemailMessage !== undefined) dto.voicemailMessage = params.voicemailMessage;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    server.timeoutSeconds = params.webhookTimeoutSeconds;
+  if (Object.keys(server).length > 0) dto.server = server;
   if (params.metadata !== undefined) dto.metadata = params.metadata;
   if (params.voice) {
     dto.voice = {
@@ -100,7 +122,13 @@ export function mapUpdateAgentToVapi(
     };
   }
   if (params.providerOptions) {
-    Object.assign(dto, params.providerOptions);
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
   }
   return dto;
 }

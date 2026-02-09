@@ -29,6 +29,11 @@ export interface CreateAgentParams {
   voice?: VoiceConfig;
   model?: ModelConfig;
   firstMessage?: string;
+  maxDurationSeconds?: number;
+  backgroundSound?: string;
+  voicemailMessage?: string;
+  webhookUrl?: string;
+  webhookTimeoutSeconds?: number;
   metadata?: Record<string, unknown>;
   providerOptions?: Record<string, unknown>;
 }
@@ -38,6 +43,11 @@ export interface UpdateAgentParams {
   voice?: VoiceConfig;
   model?: ModelConfig;
   firstMessage?: string;
+  maxDurationSeconds?: number;
+  backgroundSound?: string;
+  voicemailMessage?: string;
+  webhookUrl?: string;
+  webhookTimeoutSeconds?: number;
   metadata?: Record<string, unknown>;
   providerOptions?: Record<string, unknown>;
 }
@@ -89,6 +99,22 @@ export interface UpdateCallParams {
 export interface ListCallsParams {
   limit?: number;
   cursor?: string;
+  agentId?: string;
+  phoneNumberId?: string;
+  callStatus?: string;
+  direction?: 'inbound' | 'outbound';
+  callType?: string;
+  userSentiment?: string;
+  callSuccessful?: boolean;
+  startTime?: string;
+  endTime?: string;
+  metadata?: Record<string, string | number | boolean>;
+  dynamicVariables?: Record<string, string | number | boolean>;
+  sort?: {
+    field: 'startTime' | 'createdAt';
+    order: 'asc' | 'desc';
+  };
+  providerOptions?: Record<string, unknown>;
 }
 
 // ── Phone Number ──
