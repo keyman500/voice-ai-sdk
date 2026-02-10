@@ -3,10 +3,16 @@ import type { PhoneNumberManager } from '../../core/provider.js';
 import type {
   PhoneNumber,
   ListPhoneNumbersParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   PaginatedList,
 } from '../../core/types.js';
 import { ProviderError, NotFoundError, AuthenticationError } from '../../core/errors.js';
-import { mapVapiPhoneNumber } from './vapi-mappers.js';
+import {
+  mapVapiPhoneNumber,
+  mapCreatePhoneNumberToVapi,
+  mapUpdatePhoneNumberToVapi,
+} from './vapi-mappers.js';
 
 export class VapiPhoneNumberManager implements PhoneNumberManager {
   constructor(private readonly client: VapiClient) {}
@@ -27,6 +33,34 @@ export class VapiPhoneNumberManager implements PhoneNumberManager {
     try {
       const result = await this.client.phoneNumbers.get({ id });
       return mapVapiPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err, 'PhoneNumber', id);
+    }
+  }
+
+  async create(params: CreatePhoneNumberParams): Promise<PhoneNumber> {
+    try {
+      const dto = mapCreatePhoneNumberToVapi(params);
+      const result = await this.client.phoneNumbers.create(dto as never);
+      return mapVapiPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err);
+    }
+  }
+
+  async update(id: string, params: UpdatePhoneNumberParams): Promise<PhoneNumber> {
+    try {
+      const dto = mapUpdatePhoneNumberToVapi(params);
+      const result = await this.client.phoneNumbers.update({ id, body: dto } as never);
+      return mapVapiPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err);
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      await this.client.phoneNumbers.delete({ id });
     } catch (err) {
       throw this.wrapError(err, 'PhoneNumber', id);
     }

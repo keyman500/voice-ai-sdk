@@ -76,6 +76,36 @@ describe('VapiCallManager', () => {
       expect(result.items[0].id).toBe('call_1');
       expect(result.hasMore).toBe(false);
     });
+
+    it('maps list filters to vapi query params', async () => {
+      mockCalls.list.mockResolvedValue([]);
+      const provider = createVapi({ apiKey: 'test-key' });
+
+      await provider.calls.list({
+        limit: 10,
+        agentId: 'asst_1',
+        phoneNumberId: 'phone_1',
+        startTime: '2024-01-01T00:00:00Z',
+        endTime: '2024-01-02T00:00:00Z',
+      });
+
+      expect(mockCalls.list).toHaveBeenCalledWith({
+        limit: 10,
+        assistantId: 'asst_1',
+        phoneNumberId: 'phone_1',
+        createdAtGt: '2024-01-01T00:00:00Z',
+        createdAtLt: '2024-01-02T00:00:00Z',
+      });
+    });
+
+    it('throws on unsupported list params', async () => {
+      mockCalls.list.mockResolvedValue([]);
+      const provider = createVapi({ apiKey: 'test-key' });
+
+      await expect(
+        provider.calls.list({ callStatus: 'ended' }),
+      ).rejects.toThrow(ProviderError);
+    });
   });
 
   describe('get', () => {

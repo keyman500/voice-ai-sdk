@@ -8,9 +8,12 @@ import type {
   CreateAgentParams,
   UpdateAgentParams,
   CreateCallParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   VoiceConfig,
   ModelConfig,
 } from '../../core/types.js';
+import { ProviderError } from '../../core/errors.js';
 
 const PROVIDER = 'vapi';
 
@@ -54,6 +57,14 @@ export function mapCreateAgentToVapi(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.name = params.name;
   if (params.firstMessage !== undefined) dto.firstMessage = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined) dto.maxDurationSeconds = params.maxDurationSeconds;
+  if (params.backgroundSound !== undefined) dto.backgroundSound = params.backgroundSound;
+  if (params.voicemailMessage !== undefined) dto.voicemailMessage = params.voicemailMessage;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    server.timeoutSeconds = params.webhookTimeoutSeconds;
+  if (Object.keys(server).length > 0) dto.server = server;
   if (params.metadata !== undefined) dto.metadata = params.metadata;
   if (params.voice) {
     dto.voice = {
@@ -71,7 +82,13 @@ export function mapCreateAgentToVapi(
     };
   }
   if (params.providerOptions) {
-    Object.assign(dto, params.providerOptions);
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
   }
   return dto;
 }
@@ -83,6 +100,14 @@ export function mapUpdateAgentToVapi(
   const dto: Record<string, unknown> = { id };
   if (params.name !== undefined) dto.name = params.name;
   if (params.firstMessage !== undefined) dto.firstMessage = params.firstMessage;
+  if (params.maxDurationSeconds !== undefined) dto.maxDurationSeconds = params.maxDurationSeconds;
+  if (params.backgroundSound !== undefined) dto.backgroundSound = params.backgroundSound;
+  if (params.voicemailMessage !== undefined) dto.voicemailMessage = params.voicemailMessage;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (params.webhookTimeoutSeconds !== undefined)
+    server.timeoutSeconds = params.webhookTimeoutSeconds;
+  if (Object.keys(server).length > 0) dto.server = server;
   if (params.metadata !== undefined) dto.metadata = params.metadata;
   if (params.voice) {
     dto.voice = {
@@ -100,7 +125,13 @@ export function mapUpdateAgentToVapi(
     };
   }
   if (params.providerOptions) {
-    Object.assign(dto, params.providerOptions);
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
   }
   return dto;
 }
@@ -164,13 +195,68 @@ export function mapCreateCallToVapi(params: CreateCallParams): Record<string, un
 
 // ── Phone Number ──
 
+export function mapCreatePhoneNumberToVapi(
+  params: CreatePhoneNumberParams,
+): Record<string, unknown> {
+  if (params.outboundAgentId) {
+    throw new ProviderError('vapi', 'Unsupported phone number params: outboundAgentId');
+  }
+  const dto: Record<string, unknown> = { provider: 'vapi' };
+  if (params.name !== undefined) dto.name = params.name;
+  if (params.inboundAgentId !== undefined) dto.assistantId = params.inboundAgentId;
+  if (params.areaCode !== undefined) dto.numberDesiredAreaCode = params.areaCode;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (Object.keys(server).length > 0) dto.server = server;
+  if (params.providerOptions) {
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
+  }
+  return dto;
+}
+
+export function mapUpdatePhoneNumberToVapi(
+  params: UpdatePhoneNumberParams,
+): Record<string, unknown> {
+  if (params.outboundAgentId) {
+    throw new ProviderError('vapi', 'Unsupported phone number params: outboundAgentId');
+  }
+  const dto: Record<string, unknown> = {};
+  if (params.name !== undefined) dto.name = params.name;
+  if (params.inboundAgentId !== undefined) dto.assistantId = params.inboundAgentId;
+  const server: Record<string, unknown> = {};
+  if (params.webhookUrl !== undefined) server.url = params.webhookUrl;
+  if (Object.keys(server).length > 0) dto.server = server;
+  if (params.providerOptions) {
+    const { server: providerServer, ...rest } = params.providerOptions as Record<string, unknown>;
+    Object.assign(dto, rest);
+    if (providerServer) {
+      const mergedServer = { ...(dto.server as Record<string, unknown> | undefined) };
+      Object.assign(mergedServer, providerServer as Record<string, unknown>);
+      dto.server = mergedServer;
+    }
+  }
+  return dto;
+}
+
 export function mapVapiPhoneNumber(pn: Record<string, unknown>): PhoneNumber {
+  const inboundAgentId = pn.assistantId as string | undefined;
+  const server = pn.server as Record<string, unknown> | undefined;
   return {
     id: pn.id as string,
     provider: PROVIDER,
     number: pn.number as string | undefined,
     name: pn.name as string | undefined,
-    agentId: pn.assistantId as string | undefined,
+    agentId: inboundAgentId,
+    inboundAgentId,
+    outboundAgentId: undefined,
+    webhookUrl: server?.url as string | undefined,
+    areaCode: undefined,
     metadata: undefined,
     raw: pn,
   };

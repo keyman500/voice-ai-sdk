@@ -12,6 +12,8 @@ import type {
   UpdateCallParams,
   ListCallsParams,
   ListPhoneNumbersParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   CreateToolParams,
   UpdateToolParams,
   ListToolsParams,
@@ -42,6 +44,9 @@ export interface CallManager {
 export interface PhoneNumberManager {
   list(params?: ListPhoneNumbersParams): Promise<PaginatedList<PhoneNumber>>;
   get(id: string): Promise<PhoneNumber>;
+  create(params: CreatePhoneNumberParams): Promise<PhoneNumber>;
+  update(id: string, params: UpdatePhoneNumberParams): Promise<PhoneNumber>;
+  delete(id: string): Promise<void>;
 }
 
 export interface ToolManager {

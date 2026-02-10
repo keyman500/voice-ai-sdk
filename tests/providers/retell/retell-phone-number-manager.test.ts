@@ -18,8 +18,11 @@ let mockPhoneNumber: Record<string, jest.Mock>;
 beforeEach(() => {
   jest.clearAllMocks();
   mockPhoneNumber = {
+    create: jest.fn(),
     list: jest.fn(),
     retrieve: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
   };
   MockedRetell.mockImplementation(() => ({
     phoneNumber: mockPhoneNumber,
@@ -27,6 +30,32 @@ beforeEach(() => {
 });
 
 describe('RetellPhoneNumberManager', () => {
+  describe('create', () => {
+    it('creates a phone number', async () => {
+      mockPhoneNumber.create.mockResolvedValue(samplePhoneNumber);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      const pn = await provider.phoneNumbers.create({
+        name: 'Main Line',
+        inboundAgentId: 'agent_1',
+        outboundAgentId: 'agent_2',
+        webhookUrl: 'https://example.com/webhook',
+        areaCode: '415',
+      });
+
+      expect(pn.id).toBe('+15551234567');
+      expect(mockPhoneNumber.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nickname: 'Main Line',
+          inbound_agent_id: 'agent_1',
+          outbound_agent_id: 'agent_2',
+          inbound_webhook_url: 'https://example.com/webhook',
+          area_code: 415,
+        }),
+      );
+    });
+  });
+
   describe('list', () => {
     it('returns paginated list of phone numbers', async () => {
       mockPhoneNumber.list.mockResolvedValue([samplePhoneNumber]);
@@ -79,6 +108,38 @@ describe('RetellPhoneNumberManager', () => {
       const provider = createRetell({ apiKey: 'test-key' });
 
       await expect(provider.phoneNumbers.get('+10000000000')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('update', () => {
+    it('updates a phone number', async () => {
+      mockPhoneNumber.update.mockResolvedValue(samplePhoneNumber);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      const pn = await provider.phoneNumbers.update('+15551234567', {
+        name: 'Updated',
+        inboundAgentId: 'agent_1',
+        outboundAgentId: 'agent_2',
+        webhookUrl: 'https://example.com/new',
+      });
+
+      expect(pn.id).toBe('+15551234567');
+      expect(mockPhoneNumber.update).toHaveBeenCalledWith('+15551234567', {
+        nickname: 'Updated',
+        inbound_agent_id: 'agent_1',
+        outbound_agent_id: 'agent_2',
+        inbound_webhook_url: 'https://example.com/new',
+      });
+    });
+  });
+
+  describe('delete', () => {
+    it('deletes a phone number', async () => {
+      mockPhoneNumber.delete.mockResolvedValue(undefined);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await provider.phoneNumbers.delete('+15551234567');
+      expect(mockPhoneNumber.delete).toHaveBeenCalledWith('+15551234567');
     });
   });
 });

@@ -8,7 +8,7 @@ function makeMockProvider(overrides?: Partial<VoiceProvider>): VoiceProvider {
     providerId: 'test',
     agents: { create: noop, list: noop, get: noop, update: noop, delete: noop },
     calls: { create: noop, list: noop, get: noop, update: noop, delete: noop },
-    phoneNumbers: { list: noop, get: noop },
+    phoneNumbers: { create: noop, list: noop, get: noop, update: noop, delete: noop },
     ...overrides,
   };
 }
@@ -57,6 +57,12 @@ describe('defineProvider', () => {
     const provider = makeMockProvider();
     (provider.phoneNumbers as Record<string, unknown>).get = 42;
     expect(() => defineProvider(provider)).toThrow('phoneNumbers.get must be a function');
+  });
+
+  it('throws if phoneNumbers.create is not a function', () => {
+    const provider = makeMockProvider();
+    (provider.phoneNumbers as Record<string, unknown>).create = 'bad';
+    expect(() => defineProvider(provider)).toThrow('phoneNumbers.create must be a function');
   });
 
   it('accepts provider without optional managers', () => {

@@ -23,6 +23,11 @@ const agent = await vapi.agents.create({
   voice: { voiceId: 'jennifer' },
   model: { provider: 'openai', model: 'gpt-4', systemPrompt: 'You are a helpful assistant.' },
   firstMessage: 'Hello, how can I help you?',
+  maxDurationSeconds: 300,
+  backgroundSound: 'office',
+  voicemailMessage: 'Sorry we missed you. Leave a message after the beep.',
+  webhookUrl: 'https://example.com/webhook',
+  webhookTimeoutSeconds: 20,
 });
 
 // Make an outbound call
@@ -65,7 +70,7 @@ Every provider exposes these required managers:
 |---------|---------|-------|
 | `agents` | `create`, `list`, `get`, `update`, `delete` | Vapi assistants / Retell agents |
 | `calls` | `create`, `list`, `get`, `update`, `delete` | Outbound calls |
-| `phoneNumbers` | `list`, `get` | Read-only |
+| `phoneNumbers` | `create`, `list`, `get`, `update`, `delete` | Inbound/outbound numbers |
 
 Optional managers (provider-dependent):
 
@@ -116,9 +121,26 @@ The `Call` object includes `status` (`'queued' | 'ringing' | 'in-progress' | 'en
 ### Phone Numbers
 
 ```typescript
+const phone = await provider.phoneNumbers.create({
+  name: 'Main Line',
+  inboundAgentId: 'agent-id',
+  webhookUrl: 'https://example.com/webhook',
+  areaCode: '415',
+});
+
 const { items } = await provider.phoneNumbers.list({ limit: 10 });
 const phone = await provider.phoneNumbers.get('phone-id');
+const updated = await provider.phoneNumbers.update('phone-id', {
+  name: 'Updated Line',
+  inboundAgentId: 'agent-id',
+  webhookUrl: 'https://example.com/updated',
+});
+await provider.phoneNumbers.delete('phone-id');
 ```
+
+Notes:
+- `outboundAgentId` is Retell-only; setting it with Vapi throws a `ProviderError`.
+- `areaCode` is a string (e.g. `'415'`) and is converted to a number for Retell.
 
 ### Tools (Vapi only)
 
@@ -214,7 +236,7 @@ const myProvider = defineProvider({
   providerId: 'my-provider',
   agents: { create, list, get, update, delete },      // required
   calls: { create, list, get, update, delete },        // required
-  phoneNumbers: { list, get },                         // required
+  phoneNumbers: { create, list, get, update, delete }, // required
   tools: { create, list, get, update, delete },        // optional
   files: { create, list, get, update, delete },        // optional
   knowledgeBase: { create, list, get, delete },         // optional

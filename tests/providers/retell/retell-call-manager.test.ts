@@ -82,6 +82,65 @@ describe('RetellCallManager', () => {
       expect(result.hasMore).toBe(false);
       expect(mockCall.list).toHaveBeenCalledWith({ limit: 5 });
     });
+
+    it('maps list filters to retell criteria', async () => {
+      mockCall.list.mockResolvedValue([]);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await provider.calls.list({
+        limit: 10,
+        cursor: 'call_10',
+        agentId: 'agent_1',
+        callStatus: 'ended',
+        callType: 'phone_call',
+        direction: 'inbound',
+        userSentiment: 'positive',
+        callSuccessful: true,
+        startTime: '2024-01-01T00:00:00Z',
+        endTime: '2024-01-03T00:00:00Z',
+        metadata: {
+          customer_id: '123',
+        },
+        dynamicVariables: {
+          user_name: 'Ada',
+        },
+        sort: {
+          field: 'startTime',
+          order: 'desc',
+        },
+      });
+
+      expect(mockCall.list).toHaveBeenCalledWith({
+        limit: 10,
+        pagination_key: 'call_10',
+        filter_criteria: {
+          agent_id: ['agent_1'],
+          call_status: ['ended'],
+          call_type: ['phone_call'],
+          direction: ['inbound'],
+          user_sentiment: ['positive'],
+          call_successful: [true],
+          start_timestamp: {
+            lower_threshold: 1704067200000,
+          },
+          end_timestamp: {
+            upper_threshold: 1704240000000,
+          },
+          'metadata.customer_id': ['123'],
+          'dynamic_variables.user_name': ['Ada'],
+        },
+        sort_order: 'descending',
+      });
+    });
+
+    it('throws on unsupported list params', async () => {
+      mockCall.list.mockResolvedValue([]);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await expect(
+        provider.calls.list({ phoneNumberId: 'phone_1' }),
+      ).rejects.toThrow(ProviderError);
+    });
   });
 
   describe('get', () => {

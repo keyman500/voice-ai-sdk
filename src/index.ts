@@ -17,6 +17,8 @@ export type {
   UpdateCallParams,
   ListCallsParams,
   ListPhoneNumbersParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   CreateToolParams,
   UpdateToolParams,
   ListToolsParams,

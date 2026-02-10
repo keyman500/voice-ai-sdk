@@ -25,7 +25,21 @@ export class VapiCallManager implements CallManager {
   async list(params?: ListCallsParams): Promise<PaginatedList<Call>> {
     try {
       const opts: Record<string, unknown> = {};
-      if (params?.limit) opts.limit = params.limit;
+      if (params) {
+        const unsupported = getUnsupportedVapiListParams(params);
+        if (unsupported.length > 0) {
+          throw new ProviderError(
+            'vapi',
+            `Unsupported list params: ${unsupported.join(', ')}`,
+          );
+        }
+        if (params.limit) opts.limit = params.limit;
+        if (params.agentId) opts.assistantId = params.agentId;
+        if (params.phoneNumberId) opts.phoneNumberId = params.phoneNumberId;
+        if (params.startTime) opts.createdAtGt = params.startTime;
+        if (params.endTime) opts.createdAtLt = params.endTime;
+        if (params.providerOptions) Object.assign(opts, params.providerOptions);
+      }
       const result = await this.client.calls.list(opts as never);
       const items = (result as unknown as Record<string, unknown>[]).map(mapVapiCallToCall);
       return { items, hasMore: false };
@@ -69,3 +83,18 @@ export class VapiCallManager implements CallManager {
     return new ProviderError('vapi', (err as Error).message ?? String(err), err);
   }
 }
+
+const getUnsupportedVapiListParams = (params: ListCallsParams): string[] => {
+  const unsupported: string[] = [];
+  if (params.cursor) unsupported.push('cursor');
+  if (params.callStatus) unsupported.push('callStatus');
+  if (params.direction) unsupported.push('direction');
+  if (params.callType) unsupported.push('callType');
+  if (params.userSentiment) unsupported.push('userSentiment');
+  if (params.callSuccessful !== undefined) unsupported.push('callSuccessful');
+  if (params.metadata && Object.keys(params.metadata).length > 0) unsupported.push('metadata');
+  if (params.dynamicVariables && Object.keys(params.dynamicVariables).length > 0)
+    unsupported.push('dynamicVariables');
+  if (params.sort) unsupported.push('sort');
+  return unsupported;
+};

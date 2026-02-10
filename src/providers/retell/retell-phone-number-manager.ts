@@ -3,10 +3,16 @@ import type { PhoneNumberManager } from '../../core/provider.js';
 import type {
   PhoneNumber,
   ListPhoneNumbersParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   PaginatedList,
 } from '../../core/types.js';
 import { ProviderError, NotFoundError, AuthenticationError } from '../../core/errors.js';
-import { mapRetellPhoneNumber } from './retell-mappers.js';
+import {
+  mapRetellPhoneNumber,
+  mapCreatePhoneNumberToRetell,
+  mapUpdatePhoneNumberToRetell,
+} from './retell-mappers.js';
 
 export class RetellPhoneNumberManager implements PhoneNumberManager {
   constructor(private readonly client: Retell) {}
@@ -28,6 +34,34 @@ export class RetellPhoneNumberManager implements PhoneNumberManager {
     try {
       const result = await this.client.phoneNumber.retrieve(id);
       return mapRetellPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err, 'PhoneNumber', id);
+    }
+  }
+
+  async create(params: CreatePhoneNumberParams): Promise<PhoneNumber> {
+    try {
+      const dto = mapCreatePhoneNumberToRetell(params);
+      const result = await this.client.phoneNumber.create(dto as never);
+      return mapRetellPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err);
+    }
+  }
+
+  async update(id: string, params: UpdatePhoneNumberParams): Promise<PhoneNumber> {
+    try {
+      const dto = mapUpdatePhoneNumberToRetell(params);
+      const result = await this.client.phoneNumber.update(id, dto as never);
+      return mapRetellPhoneNumber(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      throw this.wrapError(err);
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      await this.client.phoneNumber.delete(id);
     } catch (err) {
       throw this.wrapError(err, 'PhoneNumber', id);
     }
