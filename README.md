@@ -5,7 +5,7 @@ Unified Voice AI SDK — one interface for multiple voice AI providers.
 Wraps [Vapi](https://vapi.ai) and [Retell](https://retellai.com) behind a single API so you can switch providers without rewriting your application.
 
 ```bash
-npm install voice-ai-sdk
+npm i @keyman500/voice-ai-sdk
 ```
 
 ## Quick Start
