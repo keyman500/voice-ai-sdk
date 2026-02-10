@@ -1,6 +1,6 @@
 {
   "name": "@keyman500/voice-ai-sdk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Unified Voice AI SDK — one interface for multiple voice AI providers",
   "repository": {
     "type": "git",
