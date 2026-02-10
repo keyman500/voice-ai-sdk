@@ -4,9 +4,12 @@ import {
   mapUpdateAgentToRetell,
   mapRetellCallToCall,
   mapCreateCallToRetell,
+  mapCreatePhoneNumberToRetell,
+  mapUpdatePhoneNumberToRetell,
   mapRetellPhoneNumber,
   mapRetellKnowledgeBase,
 } from '../../../src/providers/retell/retell-mappers';
+import { ProviderError } from '../../../src/core/errors';
 
 describe('Retell Mappers', () => {
   describe('mapRetellAgentToAgent', () => {
@@ -202,6 +205,48 @@ describe('Retell Mappers', () => {
       expect(result.to_number).toBe('+15551234567');
       expect(result.from_number).toBe('+15559876543');
       expect(result.metadata).toEqual({ source: 'test' });
+    });
+  });
+
+  describe('mapCreatePhoneNumberToRetell', () => {
+    it('maps unified phone number params to Retell format', () => {
+      const result = mapCreatePhoneNumberToRetell({
+        name: 'Main Line',
+        inboundAgentId: 'agent_1',
+        outboundAgentId: 'agent_2',
+        webhookUrl: 'https://example.com/webhook',
+        areaCode: '415',
+      });
+
+      expect(result).toEqual({
+        nickname: 'Main Line',
+        inbound_agent_id: 'agent_1',
+        outbound_agent_id: 'agent_2',
+        inbound_webhook_url: 'https://example.com/webhook',
+        area_code: 415,
+      });
+    });
+
+    it('throws on invalid areaCode', () => {
+      expect(() => mapCreatePhoneNumberToRetell({ areaCode: 'abc' })).toThrow(ProviderError);
+    });
+  });
+
+  describe('mapUpdatePhoneNumberToRetell', () => {
+    it('maps unified phone number update params', () => {
+      const result = mapUpdatePhoneNumberToRetell({
+        name: 'Updated',
+        inboundAgentId: 'agent_1',
+        outboundAgentId: 'agent_2',
+        webhookUrl: 'https://example.com/new',
+      });
+
+      expect(result).toEqual({
+        nickname: 'Updated',
+        inbound_agent_id: 'agent_1',
+        outbound_agent_id: 'agent_2',
+        inbound_webhook_url: 'https://example.com/new',
+      });
     });
   });
 

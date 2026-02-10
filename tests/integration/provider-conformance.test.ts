@@ -35,8 +35,11 @@ const vapiFixture: ProviderFixture = {
       delete: jest.fn(),
     };
     const mockPhoneNumbers = {
+      create: jest.fn(),
       list: jest.fn(),
       get: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     };
 
     const agent = { id: 'asst_1', name: 'Test', createdAt: '2024-01-01T00:00:00Z' };
@@ -55,6 +58,9 @@ const vapiFixture: ProviderFixture = {
     mockCalls.delete.mockResolvedValue(call);
     mockPhoneNumbers.list.mockResolvedValue([pn]);
     mockPhoneNumbers.get.mockResolvedValue(pn);
+    mockPhoneNumbers.create.mockResolvedValue(pn);
+    mockPhoneNumbers.update.mockResolvedValue(pn);
+    mockPhoneNumbers.delete.mockResolvedValue(undefined);
 
     MockedVapiClient.mockImplementation(() => ({
       assistants: mockAssistants,
@@ -84,8 +90,11 @@ const retellFixture: ProviderFixture = {
       delete: jest.fn(),
     };
     const mockPhoneNumber = {
+      create: jest.fn(),
       list: jest.fn(),
       retrieve: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     };
 
     const agent = {
@@ -116,6 +125,9 @@ const retellFixture: ProviderFixture = {
     mockCall.delete.mockResolvedValue(undefined);
     mockPhoneNumber.list.mockResolvedValue([pn]);
     mockPhoneNumber.retrieve.mockResolvedValue(pn);
+    mockPhoneNumber.create.mockResolvedValue(pn);
+    mockPhoneNumber.update.mockResolvedValue(pn);
+    mockPhoneNumber.delete.mockResolvedValue(undefined);
 
     MockedRetell.mockImplementation(() => ({
       agent: mockAgent,
@@ -216,6 +228,12 @@ describe.each([vapiFixture, retellFixture])(
     });
 
     describe('phoneNumbers', () => {
+      it('create returns a PhoneNumber', async () => {
+        const pn = await provider.phoneNumbers.create({});
+        expect(pn).toHaveProperty('id');
+        expect(pn).toHaveProperty('provider');
+      });
+
       it('list returns PaginatedList<PhoneNumber>', async () => {
         const result = await provider.phoneNumbers.list();
         expect(result).toHaveProperty('items');
@@ -231,6 +249,17 @@ describe.each([vapiFixture, retellFixture])(
         const pn = await provider.phoneNumbers.get('any-id');
         expect(pn).toHaveProperty('id');
         expect(pn).toHaveProperty('provider');
+      });
+
+      it('update returns a PhoneNumber', async () => {
+        const pn = await provider.phoneNumbers.update('any-id', {});
+        expect(pn).toHaveProperty('id');
+        expect(pn).toHaveProperty('provider');
+      });
+
+      it('delete returns void', async () => {
+        const result = await provider.phoneNumbers.delete('any-id');
+        expect(result).toBeUndefined();
       });
     });
   },

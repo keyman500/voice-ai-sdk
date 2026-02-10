@@ -29,7 +29,7 @@ export function defineProvider(config: VoiceProvider): VoiceProvider {
     }
   }
 
-  const requiredPhoneNumberMethods = ['list', 'get'] as const;
+  const requiredPhoneNumberMethods = ['create', 'list', 'get', 'update', 'delete'] as const;
   for (const method of requiredPhoneNumberMethods) {
     if (typeof (config.phoneNumbers as unknown as Record<string, unknown>)[method] !== 'function') {
       throw new VoiceAIError(`defineProvider: phoneNumbers.${method} must be a function`);

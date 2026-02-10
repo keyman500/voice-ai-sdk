@@ -8,7 +8,7 @@ function stubProvider(id: string): VoiceProvider {
     providerId: id,
     agents: { create: noop, list: noop, get: noop, update: noop, delete: noop },
     calls: { create: noop, list: noop, get: noop, update: noop, delete: noop },
-    phoneNumbers: { list: noop, get: noop },
+    phoneNumbers: { create: noop, list: noop, get: noop, update: noop, delete: noop },
   };
 }
 

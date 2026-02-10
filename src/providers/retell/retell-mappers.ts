@@ -8,8 +8,11 @@ import type {
   CreateAgentParams,
   UpdateAgentParams,
   CreateCallParams,
+  CreatePhoneNumberParams,
+  UpdatePhoneNumberParams,
   ModelConfig,
 } from '../../core/types.js';
+import { ProviderError } from '../../core/errors.js';
 
 const PROVIDER = 'retell';
 
@@ -173,13 +176,53 @@ export function mapCreateCallToRetell(params: CreateCallParams): Record<string, 
 
 // ── Phone Number ──
 
+export function mapCreatePhoneNumberToRetell(
+  params: CreatePhoneNumberParams,
+): Record<string, unknown> {
+  const dto: Record<string, unknown> = {};
+  if (params.name !== undefined) dto.nickname = params.name;
+  if (params.inboundAgentId !== undefined) dto.inbound_agent_id = params.inboundAgentId;
+  if (params.outboundAgentId !== undefined) dto.outbound_agent_id = params.outboundAgentId;
+  if (params.webhookUrl !== undefined) dto.inbound_webhook_url = params.webhookUrl;
+  if (params.areaCode !== undefined) {
+    const parsed = Number.parseInt(params.areaCode, 10);
+    if (Number.isNaN(parsed)) {
+      throw new ProviderError('retell', 'Invalid areaCode: expected numeric string');
+    }
+    dto.area_code = parsed;
+  }
+  if (params.providerOptions) {
+    Object.assign(dto, params.providerOptions);
+  }
+  return dto;
+}
+
+export function mapUpdatePhoneNumberToRetell(
+  params: UpdatePhoneNumberParams,
+): Record<string, unknown> {
+  const dto: Record<string, unknown> = {};
+  if (params.name !== undefined) dto.nickname = params.name;
+  if (params.inboundAgentId !== undefined) dto.inbound_agent_id = params.inboundAgentId;
+  if (params.outboundAgentId !== undefined) dto.outbound_agent_id = params.outboundAgentId;
+  if (params.webhookUrl !== undefined) dto.inbound_webhook_url = params.webhookUrl;
+  if (params.providerOptions) {
+    Object.assign(dto, params.providerOptions);
+  }
+  return dto;
+}
+
 export function mapRetellPhoneNumber(pn: Record<string, unknown>): PhoneNumber {
+  const inboundAgentId = pn.inbound_agent_id as string | undefined;
   return {
     id: pn.phone_number as string,
     provider: PROVIDER,
     number: pn.phone_number as string | undefined,
     name: pn.nickname as string | undefined,
-    agentId: pn.inbound_agent_id as string | undefined,
+    agentId: inboundAgentId,
+    inboundAgentId,
+    outboundAgentId: pn.outbound_agent_id as string | undefined,
+    webhookUrl: pn.inbound_webhook_url as string | undefined,
+    areaCode: pn.area_code != null ? String(pn.area_code) : undefined,
     metadata: undefined,
     raw: pn,
   };

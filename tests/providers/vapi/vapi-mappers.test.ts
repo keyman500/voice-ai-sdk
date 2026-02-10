@@ -4,10 +4,13 @@ import {
   mapUpdateAgentToVapi,
   mapVapiCallToCall,
   mapCreateCallToVapi,
+  mapCreatePhoneNumberToVapi,
+  mapUpdatePhoneNumberToVapi,
   mapVapiPhoneNumber,
   mapVapiToolToTool,
   mapVapiFileToFile,
 } from '../../../src/providers/vapi/vapi-mappers';
+import { ProviderError } from '../../../src/core/errors';
 
 describe('Vapi Mappers', () => {
   describe('mapAssistantToAgent', () => {
@@ -208,6 +211,65 @@ describe('Vapi Mappers', () => {
       expect(result.assistantId).toBe('asst_1');
       expect(result.customer).toEqual({ number: '+15551234567' });
       expect(result.phoneNumberId).toBe('pn_123');
+    });
+  });
+
+  describe('mapCreatePhoneNumberToVapi', () => {
+    it('maps unified phone number params to Vapi DTO', () => {
+      const result = mapCreatePhoneNumberToVapi({
+        name: 'Main Line',
+        inboundAgentId: 'asst_1',
+        webhookUrl: 'https://example.com/webhook',
+        areaCode: '415',
+      });
+
+      expect(result).toEqual({
+        provider: 'vapi',
+        name: 'Main Line',
+        assistantId: 'asst_1',
+        numberDesiredAreaCode: '415',
+        server: { url: 'https://example.com/webhook' },
+      });
+    });
+
+    it('merges providerOptions.server', () => {
+      const result = mapCreatePhoneNumberToVapi({
+        webhookUrl: 'https://example.com/webhook',
+        providerOptions: { server: { url: 'https://override.example.com', headers: { x: 1 } } },
+      });
+
+      expect(result.server).toEqual({
+        url: 'https://override.example.com',
+        headers: { x: 1 },
+      });
+    });
+
+    it('throws on outboundAgentId', () => {
+      expect(() => mapCreatePhoneNumberToVapi({ outboundAgentId: 'agent_1' })).toThrow(
+        ProviderError,
+      );
+    });
+  });
+
+  describe('mapUpdatePhoneNumberToVapi', () => {
+    it('maps unified phone number update params', () => {
+      const result = mapUpdatePhoneNumberToVapi({
+        name: 'Updated',
+        inboundAgentId: 'asst_2',
+        webhookUrl: 'https://example.com/new',
+      });
+
+      expect(result).toEqual({
+        name: 'Updated',
+        assistantId: 'asst_2',
+        server: { url: 'https://example.com/new' },
+      });
+    });
+
+    it('throws on outboundAgentId', () => {
+      expect(() => mapUpdatePhoneNumberToVapi({ outboundAgentId: 'agent_1' })).toThrow(
+        ProviderError,
+      );
     });
   });
 

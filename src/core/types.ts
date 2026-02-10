@@ -125,8 +125,29 @@ export interface PhoneNumber {
   number?: string;
   name?: string;
   agentId?: string;
+  inboundAgentId?: string;
+  outboundAgentId?: string;
+  webhookUrl?: string;
+  areaCode?: string;
   metadata?: Record<string, unknown>;
   raw: unknown;
+}
+
+export interface CreatePhoneNumberParams {
+  name?: string;
+  inboundAgentId?: string;
+  outboundAgentId?: string;
+  webhookUrl?: string;
+  areaCode?: string;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface UpdatePhoneNumberParams {
+  name?: string;
+  inboundAgentId?: string;
+  outboundAgentId?: string;
+  webhookUrl?: string;
+  providerOptions?: Record<string, unknown>;
 }
 
 export interface ListPhoneNumbersParams {
