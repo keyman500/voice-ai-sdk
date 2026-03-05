@@ -1,11 +1,20 @@
 jest.mock('@vapi-ai/server-sdk');
 jest.mock('retell-sdk');
+jest.mock('livekit-server-sdk');
 
 import { VapiClient } from '@vapi-ai/server-sdk';
 import Retell from 'retell-sdk';
+import { SipClient, RoomServiceClient, AgentDispatchClient, AccessToken } from 'livekit-server-sdk';
 import { createVapi } from '../../src/providers/vapi';
 import { createRetell } from '../../src/providers/retell';
+import { createLiveKit } from '../../src/providers/livekit';
 import type { VoiceProvider } from '../../src/core/provider';
+import type { LiveKitProvider } from '../../src/providers/livekit';
+
+const MockedSipClient = SipClient as jest.MockedClass<typeof SipClient>;
+const MockedRoomService = RoomServiceClient as jest.MockedClass<typeof RoomServiceClient>;
+const MockedAgentDispatch = AgentDispatchClient as jest.MockedClass<typeof AgentDispatchClient>;
+const MockedAccessToken = AccessToken as jest.MockedClass<typeof AccessToken>;
 
 const MockedVapiClient = VapiClient as jest.MockedClass<typeof VapiClient>;
 const MockedRetell = Retell as jest.MockedClass<typeof Retell>;
@@ -378,5 +387,167 @@ describe('Retell optional managers', () => {
   it('does not expose tools or files', () => {
     expect(provider.tools).toBeUndefined();
     expect(provider.files).toBeUndefined();
+  });
+});
+
+describe('LiveKit conformance', () => {
+  let provider: LiveKitProvider;
+
+  const sampleRule = {
+    sipDispatchRuleId: 'rule_1',
+    name: 'Test',
+    metadata: '',
+    attributes: {},
+    trunkIds: [],
+    hidePhoneNumber: false,
+    inboundNumbers: [],
+    numbers: [],
+  };
+  const sampleParticipant = {
+    participantId: 'p1',
+    participantIdentity: 'sip_+1',
+    roomName: 'call-room-1',
+    sipCallId: 'sip_1',
+  };
+  const sampleRoom = {
+    name: 'call-room-1',
+    creationTimeMs: BigInt(1700000000000),
+    creationTime: BigInt(0),
+  };
+  const samplePn = { id: 'pn_1', e164Format: '+14155551234', sipDispatchRuleId: 'rule_1', areaCode: '415' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    MockedSipClient.mockImplementation(() => ({
+      createSipDispatchRule: jest.fn().mockResolvedValue(sampleRule),
+      listSipDispatchRule: jest.fn().mockResolvedValue([sampleRule]),
+      updateSipDispatchRuleFields: jest.fn().mockResolvedValue(sampleRule),
+      deleteSipDispatchRule: jest.fn().mockResolvedValue(sampleRule),
+      createSipParticipant: jest.fn().mockResolvedValue(sampleParticipant),
+    } as unknown as SipClient));
+    MockedRoomService.mockImplementation(() => ({
+      listRooms: jest.fn().mockResolvedValue([sampleRoom]),
+      deleteRoom: jest.fn().mockResolvedValue(undefined),
+    } as unknown as RoomServiceClient));
+    MockedAgentDispatch.mockImplementation(() => ({
+      createDispatch: jest.fn().mockResolvedValue({}),
+    } as unknown as AgentDispatchClient));
+    MockedAccessToken.mockImplementation(() => ({
+      addSIPGrant: jest.fn(),
+      toJwt: jest.fn().mockResolvedValue('mock-jwt'),
+    } as unknown as AccessToken));
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ phone_numbers: [samplePn], phone_number: samplePn }),
+      text: jest.fn().mockResolvedValue(''),
+    });
+
+    provider = createLiveKit({ apiKey: 'key', secret: 'secret', host: 'https://test.livekit.cloud' });
+  });
+
+  describe('agents', () => {
+    it('create returns Agent with required fields', async () => {
+      const agent = await provider.agents.create({ name: 'Test' });
+      expect(agent).toHaveProperty('id');
+      expect(agent).toHaveProperty('provider');
+      expect(agent).toHaveProperty('raw');
+      expect(agent.provider).toBe('livekit');
+    });
+
+    it('list returns PaginatedList<Agent>', async () => {
+      const result = await provider.agents.list();
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('hasMore');
+      expect(Array.isArray(result.items)).toBe(true);
+    });
+
+    it('get returns a single Agent', async () => {
+      const agent = await provider.agents.get('rule_1');
+      expect(agent).toHaveProperty('id');
+      expect(agent.provider).toBe('livekit');
+    });
+
+    it('update returns an Agent', async () => {
+      const agent = await provider.agents.update('rule_1', { name: 'Updated' });
+      expect(agent).toHaveProperty('id');
+    });
+
+    it('delete returns void', async () => {
+      const result = await provider.agents.delete('rule_1');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('calls', () => {
+    it('create returns Call with required fields', async () => {
+      const call = await provider.calls.create({
+        toNumber: '+14155551234',
+        providerOptions: { trunkId: 'trunk_1' },
+      });
+      expect(call).toHaveProperty('id');
+      expect(call).toHaveProperty('provider');
+      expect(call).toHaveProperty('status');
+      expect(call.provider).toBe('livekit');
+    });
+
+    it('delete returns void', async () => {
+      const result = await provider.calls.delete('call-room-1');
+      expect(result).toBeUndefined();
+    });
+
+    it('listActive (LiveKit-specific) returns PaginatedList<Call>', async () => {
+      const result = await provider.calls.listActive();
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('hasMore');
+      expect(result.items[0].status).toBe('in-progress');
+    });
+  });
+
+  describe('phoneNumbers', () => {
+    it('list returns PaginatedList<PhoneNumber>', async () => {
+      const result = await provider.phoneNumbers.list();
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('hasMore');
+      expect(result.items[0].provider).toBe('livekit');
+    });
+
+    it('get returns a PhoneNumber', async () => {
+      const pn = await provider.phoneNumbers.get('pn_1');
+      expect(pn).toHaveProperty('id');
+      expect(pn.provider).toBe('livekit');
+    });
+
+    it('create returns a PhoneNumber', async () => {
+      const pn = await provider.phoneNumbers.create({ areaCode: '415' });
+      expect(pn).toHaveProperty('id');
+      expect(pn.provider).toBe('livekit');
+    });
+
+    it('update returns a PhoneNumber', async () => {
+      const pn = await provider.phoneNumbers.update('pn_1', {});
+      expect(pn).toHaveProperty('id');
+    });
+
+    it('delete returns void', async () => {
+      const result = await provider.phoneNumbers.delete('pn_1');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('optional managers', () => {
+    it('does not expose tools', () => {
+      expect(provider.tools).toBeUndefined();
+    });
+
+    it('does not expose files', () => {
+      expect(provider.files).toBeUndefined();
+    });
+
+    it('does not expose knowledgeBase', () => {
+      expect(provider.knowledgeBase).toBeUndefined();
+    });
   });
 });

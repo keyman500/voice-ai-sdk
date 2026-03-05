@@ -62,3 +62,6 @@ export type { VapiConfig } from './providers/vapi/index.js';
 
 export { createRetell } from './providers/retell/index.js';
 export type { RetellConfig } from './providers/retell/index.js';
+
+export { createLiveKit } from './providers/livekit/index.js';
+export type { LiveKitConfig, LiveKitProvider } from './providers/livekit/index.js';
