@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../test-voice-ai-sdk/test"
+		}
+	],
+	"settings": {}
+}

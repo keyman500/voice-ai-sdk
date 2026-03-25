@@ -1,5 +1,10 @@
 import type { SIPDispatchRuleInfo, SIPParticipantInfo, Room } from '@livekit/protocol';
-import type { CreateSipDispatchRuleOptions, SipDispatchRuleDirect, SipDispatchRuleUpdateOptions } from 'livekit-server-sdk';
+import type {
+  CreateSipDispatchRuleOptions,
+  SipDispatchRuleDirect,
+  SipDispatchRuleIndividual,
+  SipDispatchRuleUpdateOptions,
+} from 'livekit-server-sdk';
 import type { Agent, Call, PhoneNumber, CreateAgentParams, UpdateAgentParams, CreatePhoneNumberParams } from '../../core/types.js';
 
 export function mapDispatchRuleToAgent(rule: SIPDispatchRuleInfo): Agent {
@@ -30,7 +35,7 @@ export function mapDispatchRuleToAgent(rule: SIPDispatchRuleInfo): Agent {
 
 export function mapCreateAgentToLiveKit(
   params: CreateAgentParams,
-): { rule: SipDispatchRuleDirect; opts: CreateSipDispatchRuleOptions } {
+): { rule: SipDispatchRuleDirect | SipDispatchRuleIndividual; opts: CreateSipDispatchRuleOptions } {
   const attributes: Record<string, string> = {};
   if (params.voice?.voiceId) attributes['agentVoiceId'] = params.voice.voiceId;
   if (params.voice?.provider) attributes['agentVoiceProvider'] = params.voice.provider;
@@ -43,16 +48,27 @@ export function mapCreateAgentToLiveKit(
   const providerAttrs = (params.providerOptions?.attributes as Record<string, string> | undefined) ?? {};
   Object.assign(attributes, providerAttrs);
 
-  const roomName: string = (params.providerOptions?.roomName as string | undefined) ?? '';
+  const opts: CreateSipDispatchRuleOptions = {
+    name: params.name,
+    metadata: params.metadata ? JSON.stringify(params.metadata) : undefined,
+    attributes,
+    trunkIds: params.providerOptions?.trunkIds as string[] | undefined,
+  };
 
+  const ruleType = params.providerOptions?.ruleType as string | undefined;
+  if (ruleType === 'individual') {
+    const roomPrefix =
+      (params.providerOptions?.roomPrefix as string | undefined)?.trim() || 'agent-';
+    return {
+      rule: { type: 'individual', roomPrefix },
+      opts,
+    };
+  }
+
+  const roomName: string = (params.providerOptions?.roomName as string | undefined) ?? '';
   return {
     rule: { type: 'direct', roomName },
-    opts: {
-      name: params.name,
-      metadata: params.metadata ? JSON.stringify(params.metadata) : undefined,
-      attributes,
-      trunkIds: params.providerOptions?.trunkIds as string[] | undefined,
-    },
+    opts,
   };
 }
 

@@ -93,8 +93,28 @@ describe('mapCreateAgentToLiveKit', () => {
     expect(opts.trunkIds).toEqual(['trunk_1']);
   });
 
+  it('maps individual rule params when requested', () => {
+    const { rule, opts } = mapCreateAgentToLiveKit({
+      name: 'My Agent',
+      providerOptions: { ruleType: 'individual', roomPrefix: 'support-' },
+    });
+    expect(rule.type).toBe('individual');
+    expect('roomPrefix' in rule && rule.roomPrefix).toBe('support-');
+    expect(opts.name).toBe('My Agent');
+  });
+
+  it('defaults individual roomPrefix when not provided', () => {
+    const { rule } = mapCreateAgentToLiveKit({
+      name: 'My Agent',
+      providerOptions: { ruleType: 'individual' },
+    });
+    expect(rule.type).toBe('individual');
+    expect('roomPrefix' in rule && rule.roomPrefix).toBe('agent-');
+  });
+
   it('uses empty roomName when not provided', () => {
     const { rule } = mapCreateAgentToLiveKit({ name: 'x' });
+    expect(rule.type).toBe('direct');
     expect(rule.roomName).toBe('');
   });
 
