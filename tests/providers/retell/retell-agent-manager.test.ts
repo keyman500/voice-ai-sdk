@@ -11,11 +11,15 @@ const sampleAgent = {
   agent_name: 'Test',
   voice_id: 'emma',
   response_engine: { type: 'retell-llm', llm_id: 'llm_1' },
-  begin_message: 'Hello',
   last_modification_timestamp: 1700000000000,
 };
 
 let mockAgent: Record<string, jest.Mock>;
+let mockLlm: {
+  retrieve: jest.Mock;
+  update: jest.Mock;
+  create: jest.Mock;
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -26,8 +30,17 @@ beforeEach(() => {
     update: jest.fn(),
     delete: jest.fn(),
   };
+  mockLlm = {
+    retrieve: jest.fn().mockResolvedValue({
+      llm_id: 'llm_1',
+      begin_message: 'Hello',
+    }),
+    update: jest.fn().mockResolvedValue({ llm_id: 'llm_1', begin_message: 'Hello' }),
+    create: jest.fn(),
+  };
   MockedRetell.mockImplementation(() => ({
     agent: mockAgent,
+    llm: mockLlm,
   } as unknown as Retell));
 });
 
@@ -50,6 +63,8 @@ describe('RetellAgentManager', () => {
       expect(agent.id).toBe('agent_1');
       expect(agent.provider).toBe('retell');
       expect(agent.name).toBe('Test');
+      expect(agent.firstMessage).toBe('Hello');
+      expect(mockLlm.retrieve).toHaveBeenCalledWith('llm_1');
       expect(mockAgent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           agent_name: 'Test',
@@ -65,6 +80,25 @@ describe('RetellAgentManager', () => {
             },
           },
         }),
+      );
+    });
+
+    it('calls llm.update for firstMessage when response engine is retell-llm', async () => {
+      mockAgent.create.mockResolvedValue({
+        ...sampleAgent,
+        response_engine: { type: 'retell-llm', llm_id: 'llm_new' },
+      });
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await provider.agents.create({
+        name: 'Bot',
+        model: { provider: 'retell-llm', model: 'llm_new' },
+        firstMessage: 'Welcome aboard',
+      });
+
+      expect(mockLlm.update).toHaveBeenCalledWith(
+        'llm_new',
+        expect.objectContaining({ begin_message: 'Welcome aboard' }),
       );
     });
 
@@ -93,7 +127,9 @@ describe('RetellAgentManager', () => {
       const result = await provider.agents.list({ limit: 1 });
       expect(result.items).toHaveLength(1);
       expect(result.items[0].id).toBe('agent_1');
+      expect(result.items[0].firstMessage).toBeUndefined();
       expect(result.hasMore).toBe(false);
+      expect(mockLlm.retrieve).not.toHaveBeenCalled();
     });
 
     it('returns all agents when no limit', async () => {
@@ -106,13 +142,31 @@ describe('RetellAgentManager', () => {
   });
 
   describe('get', () => {
-    it('gets an agent by id', async () => {
+    it('gets an agent by id and hydrates firstMessage from llm.retrieve', async () => {
       mockAgent.retrieve.mockResolvedValue(sampleAgent);
+      mockLlm.retrieve.mockResolvedValue({ llm_id: 'llm_1', begin_message: 'Hi from llm' });
       const provider = createRetell({ apiKey: 'test-key' });
 
       const agent = await provider.agents.get('agent_1');
       expect(agent.id).toBe('agent_1');
+      expect(agent.firstMessage).toBe('Hi from llm');
       expect(mockAgent.retrieve).toHaveBeenCalledWith('agent_1');
+      expect(mockLlm.retrieve).toHaveBeenCalledWith('llm_1');
+    });
+
+    it('does not call llm.retrieve for custom-llm agents', async () => {
+      mockAgent.retrieve.mockResolvedValue({
+        ...sampleAgent,
+        response_engine: {
+          type: 'custom-llm',
+          llm_websocket_url: 'wss://x',
+        },
+      });
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      const agent = await provider.agents.get('agent_1');
+      expect(agent.firstMessage).toBeUndefined();
+      expect(mockLlm.retrieve).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError on 404', async () => {
@@ -155,6 +209,23 @@ describe('RetellAgentManager', () => {
             },
           },
         }),
+      );
+    });
+
+    it('updates firstMessage via llm.update for retell-llm, not agent.begin_message', async () => {
+      mockAgent.retrieve.mockResolvedValue(sampleAgent);
+      mockAgent.update.mockResolvedValue(sampleAgent);
+      mockLlm.retrieve.mockResolvedValue({ begin_message: 'New opening' });
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await provider.agents.update('agent_1', { firstMessage: 'New opening' });
+
+      expect(mockAgent.update).toHaveBeenCalledWith('agent_1', expect.not.objectContaining({
+        begin_message: expect.anything(),
+      }));
+      expect(mockLlm.update).toHaveBeenCalledWith(
+        'llm_1',
+        expect.objectContaining({ begin_message: 'New opening' }),
       );
     });
   });

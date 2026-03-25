@@ -35,7 +35,53 @@ function mapModelFromRetell(
       model: (responseEngine.llm_websocket_url as string) ?? '',
     };
   }
+  if (type === 'conversation-flow') {
+    return {
+      provider: 'conversation-flow',
+      model: (responseEngine.conversation_flow_id as string) ?? '',
+    };
+  }
   return undefined;
+}
+
+/**
+ * Maps unified {@link ModelConfig} to Retell `response_engine` object.
+ * @throws ProviderError when type/value combination is invalid for Retell's API.
+ */
+export function mapModelConfigToRetellResponseEngine(model: ModelConfig): Record<string, unknown> {
+  const provider = model.provider;
+  const id = typeof model.model === 'string' ? model.model.trim() : String(model.model ?? '');
+  if (provider === 'retell-llm') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'retell-llm requires a non-empty llm_id in model.model',
+      );
+    }
+    return { type: 'retell-llm', llm_id: model.model };
+  }
+  if (provider === 'custom-llm') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'custom-llm requires a non-empty llm_websocket_url in model.model',
+      );
+    }
+    return { type: 'custom-llm', llm_websocket_url: model.model };
+  }
+  if (provider === 'conversation-flow') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'conversation-flow requires a non-empty conversation_flow_id in model.model',
+      );
+    }
+    return { type: 'conversation-flow', conversation_flow_id: model.model };
+  }
+  throw new ProviderError(
+    'retell',
+    `Unsupported Retell response engine type "${provider}". Use retell-llm, custom-llm, or conversation-flow.`,
+  );
 }
 
 export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
@@ -47,7 +93,8 @@ export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
       ? { voiceId: agent.voice_id as string }
       : undefined,
     model: mapModelFromRetell(agent.response_engine as Record<string, unknown> | undefined),
-    firstMessage: agent.begin_message as string | undefined,
+    // For retell-llm, begin_message lives on the LLM resource; RetellAgentManager hydrates via llm.retrieve.
+    firstMessage: undefined,
     metadata: undefined,
     raw: agent,
   };
@@ -59,7 +106,9 @@ export function mapCreateAgentToRetell(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
-  if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  const firstMessageOnAgent =
+    params.firstMessage !== undefined && params.model?.provider !== 'retell-llm';
+  if (firstMessageOnAgent) dto.begin_message = params.firstMessage;
   if (params.maxDurationSeconds !== undefined)
     dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
   if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
@@ -75,10 +124,7 @@ export function mapCreateAgentToRetell(
     };
   }
   if (params.model) {
-    dto.response_engine = {
-      type: params.model.provider,
-      llm_id: params.model.model,
-    };
+    dto.response_engine = mapModelConfigToRetellResponseEngine(params.model);
   }
   if (params.providerOptions) {
     Object.assign(dto, params.providerOptions);
@@ -92,7 +138,9 @@ export function mapUpdateAgentToRetell(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
-  if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  const firstMessageOnAgentUpdate =
+    params.firstMessage !== undefined && params.model?.provider !== 'retell-llm';
+  if (firstMessageOnAgentUpdate) dto.begin_message = params.firstMessage;
   if (params.maxDurationSeconds !== undefined)
     dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
   if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
@@ -108,10 +156,7 @@ export function mapUpdateAgentToRetell(
     };
   }
   if (params.model) {
-    dto.response_engine = {
-      type: params.model.provider,
-      llm_id: params.model.model,
-    };
+    dto.response_engine = mapModelConfigToRetellResponseEngine(params.model);
   }
   if (params.providerOptions) {
     Object.assign(dto, params.providerOptions);

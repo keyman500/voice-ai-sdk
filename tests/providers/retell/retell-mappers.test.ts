@@ -13,7 +13,7 @@ import { ProviderError } from '../../../src/core/errors';
 
 describe('Retell Mappers', () => {
   describe('mapRetellAgentToAgent', () => {
-    it('maps a full Retell agent to unified Agent', () => {
+    it('maps a full Retell agent to unified Agent (firstMessage from LLM, not agent.begin_message)', () => {
       const retellAgent = {
         agent_id: 'agent_1',
         agent_name: 'Support Bot',
@@ -32,7 +32,7 @@ describe('Retell Mappers', () => {
       expect(agent.name).toBe('Support Bot');
       expect(agent.voice).toEqual({ voiceId: 'emma' });
       expect(agent.model).toEqual({ provider: 'retell-llm', model: 'llm_123' });
-      expect(agent.firstMessage).toBe('Hi there!');
+      expect(agent.firstMessage).toBeUndefined();
       expect(agent.raw).toBe(retellAgent);
     });
 
@@ -47,6 +47,20 @@ describe('Retell Mappers', () => {
       expect(agent.model).toEqual({
         provider: 'custom-llm',
         model: 'wss://my-llm.example.com',
+      });
+    });
+
+    it('handles conversation-flow response engine', () => {
+      const agent = mapRetellAgentToAgent({
+        agent_id: 'a_flow',
+        response_engine: {
+          type: 'conversation-flow',
+          conversation_flow_id: 'flow_abc',
+        },
+      });
+      expect(agent.model).toEqual({
+        provider: 'conversation-flow',
+        model: 'flow_abc',
       });
     });
 
@@ -80,7 +94,7 @@ describe('Retell Mappers', () => {
         type: 'retell-llm',
         llm_id: 'llm_123',
       });
-      expect(result.begin_message).toBe('Hello!');
+      expect(result.begin_message).toBeUndefined();
       expect(result.max_call_duration_ms).toBe(300000);
       expect(result.ambient_sound).toBe('coffee-shop');
       expect(result.webhook_url).toBe('https://example.com/webhook');
@@ -105,6 +119,50 @@ describe('Retell Mappers', () => {
     it('handles empty params', () => {
       const result = mapCreateAgentToRetell({});
       expect(Object.keys(result)).toHaveLength(0);
+    });
+
+    it('maps custom-llm response_engine with llm_websocket_url', () => {
+      const result = mapCreateAgentToRetell({
+        model: { provider: 'custom-llm', model: 'wss://example.com/ws' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'custom-llm',
+        llm_websocket_url: 'wss://example.com/ws',
+      });
+    });
+
+    it('maps conversation-flow response_engine with conversation_flow_id', () => {
+      const result = mapCreateAgentToRetell({
+        model: { provider: 'conversation-flow', model: 'cf_123' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'conversation-flow',
+        conversation_flow_id: 'cf_123',
+      });
+    });
+
+    it('sets begin_message on agent when firstMessage is set but engine is not retell-llm', () => {
+      const result = mapCreateAgentToRetell({
+        firstMessage: 'Hello',
+        model: { provider: 'custom-llm', model: 'wss://x' },
+      });
+      expect(result.begin_message).toBe('Hello');
+    });
+
+    it('throws ProviderError for invalid retell-llm model (missing llm_id)', () => {
+      expect(() =>
+        mapCreateAgentToRetell({
+          model: { provider: 'retell-llm', model: '' },
+        }),
+      ).toThrow(ProviderError);
+    });
+
+    it('throws ProviderError for unsupported model provider', () => {
+      expect(() =>
+        mapCreateAgentToRetell({
+          model: { provider: 'openai', model: 'gpt-4' },
+        }),
+      ).toThrow(ProviderError);
     });
   });
 
@@ -133,6 +191,33 @@ describe('Retell Mappers', () => {
           text: 'Bye.',
         },
       });
+    });
+
+    it('maps model update to custom-llm response_engine', () => {
+      const result = mapUpdateAgentToRetell({
+        model: { provider: 'custom-llm', model: 'wss://ws.example' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'custom-llm',
+        llm_websocket_url: 'wss://ws.example',
+      });
+    });
+
+    it('does not set begin_message on agent update when firstMessage targets retell-llm LLM', () => {
+      const result = mapUpdateAgentToRetell({
+        firstMessage: 'Hi',
+        model: { provider: 'retell-llm', model: 'llm_1' },
+      });
+      expect(result.begin_message).toBeUndefined();
+      expect(result.response_engine).toEqual({ type: 'retell-llm', llm_id: 'llm_1' });
+    });
+
+    it('throws ProviderError for invalid custom-llm (empty url)', () => {
+      expect(() =>
+        mapUpdateAgentToRetell({
+          model: { provider: 'custom-llm', model: '' },
+        }),
+      ).toThrow(ProviderError);
     });
   });
 
