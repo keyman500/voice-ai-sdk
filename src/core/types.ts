@@ -9,6 +9,8 @@ export interface ModelConfig {
   provider: string;
   model: string;
   systemPrompt?: string;
+  /** Retell LLM: linked knowledge base IDs (hydrated from `llm.retrieve`). */
+  knowledgeBaseIds?: string[];
 }
 
 // ── Agent ──
@@ -117,6 +119,62 @@ export interface ListCallsParams {
   providerOptions?: Record<string, unknown>;
 }
 
+// ── Campaign ──
+
+export type CampaignStatus =
+  | 'draft'
+  | 'queued'
+  | 'scheduled'
+  | 'in-progress'
+  | 'ended'
+  | 'cancelled'
+  | 'unknown';
+
+export interface CampaignTask {
+  toNumber: string;
+  metadata?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface Campaign {
+  id: string;
+  provider: string;
+  name?: string;
+  agentId?: string;
+  fromNumber?: string;
+  status: CampaignStatus;
+  recipientCount: number;
+  scheduledAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+  metadata?: Record<string, unknown>;
+  raw: unknown;
+}
+
+export interface CreateCampaignParams {
+  name?: string;
+  agentId?: string;
+  fromNumber: string;
+  tasks: CampaignTask[];
+  scheduledAt?: Date | string | number;
+  metadata?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface UpdateCampaignParams {
+  name?: string;
+  status?: CampaignStatus;
+  scheduledAt?: Date | string | number;
+  metadata?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+export interface ListCampaignsParams {
+  limit?: number;
+  cursor?: string;
+  status?: CampaignStatus;
+}
+
 // ── Phone Number ──
 
 export interface PhoneNumber {
@@ -220,6 +278,8 @@ export interface KnowledgeBaseSource {
   id: string;
   type: string;
   url?: string;
+  title?: string;
+  filename?: string;
 }
 
 export interface KnowledgeBase {
@@ -239,6 +299,14 @@ export interface CreateKnowledgeBaseParams {
 export interface ListKnowledgeBaseParams {
   limit?: number;
   cursor?: string;
+}
+
+/** Retell: add URL / text / file sources to an existing knowledge base. */
+export interface AddKnowledgeBaseSourcesParams {
+  urls?: string[];
+  texts?: Array<{ title: string; text: string }>;
+  /** Pass-through uploads for Retell (`File`, `Blob`, `Buffer`, etc.). */
+  files?: unknown[];
 }
 
 // ── Pagination ──

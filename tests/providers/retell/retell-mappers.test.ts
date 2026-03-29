@@ -8,12 +8,14 @@ import {
   mapUpdatePhoneNumberToRetell,
   mapRetellPhoneNumber,
   mapRetellKnowledgeBase,
+  mapCreateCampaignToRetellBatchCall,
+  mapRetellBatchCallToCampaign,
 } from '../../../src/providers/retell/retell-mappers';
 import { ProviderError } from '../../../src/core/errors';
 
 describe('Retell Mappers', () => {
   describe('mapRetellAgentToAgent', () => {
-    it('maps a full Retell agent to unified Agent', () => {
+    it('maps a full Retell agent to unified Agent (firstMessage from LLM, not agent.begin_message)', () => {
       const retellAgent = {
         agent_id: 'agent_1',
         agent_name: 'Support Bot',
@@ -32,13 +34,14 @@ describe('Retell Mappers', () => {
       expect(agent.name).toBe('Support Bot');
       expect(agent.voice).toEqual({ voiceId: 'emma' });
       expect(agent.model).toEqual({ provider: 'retell-llm', model: 'llm_123' });
-      expect(agent.firstMessage).toBe('Hi there!');
+      expect(agent.firstMessage).toBeUndefined();
       expect(agent.raw).toBe(retellAgent);
     });
 
     it('handles custom-llm response engine', () => {
       const agent = mapRetellAgentToAgent({
         agent_id: 'a2',
+        begin_message: 'Hi from custom LLM',
         response_engine: {
           type: 'custom-llm',
           llm_websocket_url: 'wss://my-llm.example.com',
@@ -47,6 +50,21 @@ describe('Retell Mappers', () => {
       expect(agent.model).toEqual({
         provider: 'custom-llm',
         model: 'wss://my-llm.example.com',
+      });
+      expect(agent.firstMessage).toBe('Hi from custom LLM');
+    });
+
+    it('handles conversation-flow response engine', () => {
+      const agent = mapRetellAgentToAgent({
+        agent_id: 'a_flow',
+        response_engine: {
+          type: 'conversation-flow',
+          conversation_flow_id: 'flow_abc',
+        },
+      });
+      expect(agent.model).toEqual({
+        provider: 'conversation-flow',
+        model: 'flow_abc',
       });
     });
 
@@ -80,7 +98,7 @@ describe('Retell Mappers', () => {
         type: 'retell-llm',
         llm_id: 'llm_123',
       });
-      expect(result.begin_message).toBe('Hello!');
+      expect(result.begin_message).toBeUndefined();
       expect(result.max_call_duration_ms).toBe(300000);
       expect(result.ambient_sound).toBe('coffee-shop');
       expect(result.webhook_url).toBe('https://example.com/webhook');
@@ -105,6 +123,50 @@ describe('Retell Mappers', () => {
     it('handles empty params', () => {
       const result = mapCreateAgentToRetell({});
       expect(Object.keys(result)).toHaveLength(0);
+    });
+
+    it('maps custom-llm response_engine with llm_websocket_url', () => {
+      const result = mapCreateAgentToRetell({
+        model: { provider: 'custom-llm', model: 'wss://example.com/ws' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'custom-llm',
+        llm_websocket_url: 'wss://example.com/ws',
+      });
+    });
+
+    it('maps conversation-flow response_engine with conversation_flow_id', () => {
+      const result = mapCreateAgentToRetell({
+        model: { provider: 'conversation-flow', model: 'cf_123' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'conversation-flow',
+        conversation_flow_id: 'cf_123',
+      });
+    });
+
+    it('sets begin_message on agent when firstMessage is set but engine is not retell-llm', () => {
+      const result = mapCreateAgentToRetell({
+        firstMessage: 'Hello',
+        model: { provider: 'custom-llm', model: 'wss://x' },
+      });
+      expect(result.begin_message).toBe('Hello');
+    });
+
+    it('throws ProviderError for invalid retell-llm model (missing llm_id)', () => {
+      expect(() =>
+        mapCreateAgentToRetell({
+          model: { provider: 'retell-llm', model: '' },
+        }),
+      ).toThrow(ProviderError);
+    });
+
+    it('throws ProviderError for unsupported model provider', () => {
+      expect(() =>
+        mapCreateAgentToRetell({
+          model: { provider: 'openai', model: 'gpt-4' },
+        }),
+      ).toThrow(ProviderError);
     });
   });
 
@@ -133,6 +195,33 @@ describe('Retell Mappers', () => {
           text: 'Bye.',
         },
       });
+    });
+
+    it('maps model update to custom-llm response_engine', () => {
+      const result = mapUpdateAgentToRetell({
+        model: { provider: 'custom-llm', model: 'wss://ws.example' },
+      });
+      expect(result.response_engine).toEqual({
+        type: 'custom-llm',
+        llm_websocket_url: 'wss://ws.example',
+      });
+    });
+
+    it('does not set begin_message on agent update when firstMessage targets retell-llm LLM', () => {
+      const result = mapUpdateAgentToRetell({
+        firstMessage: 'Hi',
+        model: { provider: 'retell-llm', model: 'llm_1' },
+      });
+      expect(result.begin_message).toBeUndefined();
+      expect(result.response_engine).toEqual({ type: 'retell-llm', llm_id: 'llm_1' });
+    });
+
+    it('throws ProviderError for invalid custom-llm (empty url)', () => {
+      expect(() =>
+        mapUpdateAgentToRetell({
+          model: { provider: 'custom-llm', model: '' },
+        }),
+      ).toThrow(ProviderError);
     });
   });
 
@@ -266,6 +355,85 @@ describe('Retell Mappers', () => {
       expect(result.name).toBe('Main Line');
       expect(result.agentId).toBe('agent_1');
       expect(result.raw).toBe(pn);
+    });
+  });
+
+  describe('mapCreateCampaignToRetellBatchCall', () => {
+    const base = {
+      fromNumber: '+15559876543',
+      tasks: [{ toNumber: '+15551234567' }],
+    };
+
+    it('sets trigger_timestamp to Unix ms from ISO string', () => {
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: '2023-11-15T12:00:00.000Z',
+      });
+      expect(result.trigger_timestamp).toBe(1_700_049_600_000);
+    });
+
+    it('sets trigger_timestamp from Date', () => {
+      const d = new Date('2023-11-15T12:00:00.000Z');
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: d,
+      });
+      expect(result.trigger_timestamp).toBe(d.getTime());
+    });
+
+    it('sets trigger_timestamp from numeric Unix ms', () => {
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: 1_700_049_600_000,
+      });
+      expect(result.trigger_timestamp).toBe(1_700_049_600_000);
+    });
+
+    it('omits trigger_timestamp when scheduledAt is undefined', () => {
+      const result = mapCreateCampaignToRetellBatchCall(base);
+      expect(result.trigger_timestamp).toBeUndefined();
+    });
+
+    it('throws ProviderError when scheduledAt string is not parseable', () => {
+      expect(() =>
+        mapCreateCampaignToRetellBatchCall({
+          ...base,
+          scheduledAt: 'not-a-date',
+        }),
+      ).toThrow(ProviderError);
+    });
+  });
+
+  describe('mapRetellBatchCallToCampaign', () => {
+    it('maps scheduled_timestamp and created_at from seconds to Date', () => {
+      const result = mapRetellBatchCallToCampaign({
+        batch_call_id: 'batch_1',
+        name: 'Campaign A',
+        agent_id: 'agent_1',
+        from_number: '+15559876543',
+        status: 'scheduled',
+        total_task_count: 2,
+        scheduled_timestamp: 1_735_718_400,
+        created_at: 1_735_714_800,
+      });
+
+      expect(result.id).toBe('batch_1');
+      expect(result.recipientCount).toBe(2);
+      expect(result.scheduledAt).toEqual(new Date(1_735_718_400_000));
+      expect(result.createdAt).toEqual(new Date(1_735_714_800_000));
+    });
+
+    it('supports legacy trigger_timestamp and total_tasks_count fields', () => {
+      const result = mapRetellBatchCallToCampaign({
+        batch_call_id: 'batch_legacy',
+        total_tasks_count: 3,
+        trigger_timestamp: 1_700_049_600_000,
+        create_time: 1_700_040_000_000,
+      });
+
+      expect(result.recipientCount).toBe(3);
+      expect(result.scheduledAt).toEqual(new Date(1_700_049_600_000));
+      expect(result.createdAt).toEqual(new Date(1_700_040_000_000));
     });
   });
 

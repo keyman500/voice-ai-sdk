@@ -8,6 +8,9 @@ import type {
   CreateAgentParams,
   UpdateAgentParams,
   CreateCallParams,
+  Campaign,
+  CampaignStatus,
+  CreateCampaignParams,
   CreatePhoneNumberParams,
   UpdatePhoneNumberParams,
   ModelConfig,
@@ -15,6 +18,26 @@ import type {
 import { ProviderError } from '../../core/errors.js';
 
 const PROVIDER = 'retell';
+
+function scheduledAtToTriggerTimestampMs(
+  scheduledAt: Date | string | number,
+): number {
+  let ms: number;
+  if (scheduledAt instanceof Date) {
+    ms = scheduledAt.getTime();
+  } else if (typeof scheduledAt === 'number') {
+    ms = Number(scheduledAt);
+  } else {
+    ms = Date.parse(scheduledAt);
+  }
+  if (!Number.isFinite(ms)) {
+    throw new ProviderError(
+      'retell',
+      'Invalid scheduledAt: expected a Date, Unix millisecond timestamp, or parseable date string',
+    );
+  }
+  return Math.trunc(ms);
+}
 
 // ── Agent ──
 
@@ -35,10 +58,60 @@ function mapModelFromRetell(
       model: (responseEngine.llm_websocket_url as string) ?? '',
     };
   }
+  if (type === 'conversation-flow') {
+    return {
+      provider: 'conversation-flow',
+      model: (responseEngine.conversation_flow_id as string) ?? '',
+    };
+  }
   return undefined;
 }
 
+/**
+ * Maps unified {@link ModelConfig} to Retell `response_engine` object.
+ * @throws ProviderError when type/value combination is invalid for Retell's API.
+ */
+export function mapModelConfigToRetellResponseEngine(model: ModelConfig): Record<string, unknown> {
+  const provider = model.provider;
+  const id = typeof model.model === 'string' ? model.model.trim() : String(model.model ?? '');
+  if (provider === 'retell-llm') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'retell-llm requires a non-empty llm_id in model.model',
+      );
+    }
+    return { type: 'retell-llm', llm_id: model.model };
+  }
+  if (provider === 'custom-llm') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'custom-llm requires a non-empty llm_websocket_url in model.model',
+      );
+    }
+    return { type: 'custom-llm', llm_websocket_url: model.model };
+  }
+  if (provider === 'conversation-flow') {
+    if (!id) {
+      throw new ProviderError(
+        'retell',
+        'conversation-flow requires a non-empty conversation_flow_id in model.model',
+      );
+    }
+    return { type: 'conversation-flow', conversation_flow_id: model.model };
+  }
+  throw new ProviderError(
+    'retell',
+    `Unsupported Retell response engine type "${provider}". Use retell-llm, custom-llm, or conversation-flow.`,
+  );
+}
+
 export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
+  const responseEngine = agent.response_engine as Record<string, unknown> | undefined;
+  const isRetellLlm = responseEngine?.type === 'retell-llm';
+  const beginMessage = agent.begin_message as string | undefined;
+
   return {
     id: agent.agent_id as string,
     provider: PROVIDER,
@@ -46,8 +119,9 @@ export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
     voice: agent.voice_id
       ? { voiceId: agent.voice_id as string }
       : undefined,
-    model: mapModelFromRetell(agent.response_engine as Record<string, unknown> | undefined),
-    firstMessage: agent.begin_message as string | undefined,
+    model: mapModelFromRetell(responseEngine),
+    // For retell-llm, begin_message lives on the LLM resource; RetellAgentManager hydrates via llm.retrieve.
+    firstMessage: !isRetellLlm && beginMessage ? beginMessage : undefined,
     metadata: undefined,
     raw: agent,
   };
@@ -59,7 +133,9 @@ export function mapCreateAgentToRetell(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
-  if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  const firstMessageOnAgent =
+    params.firstMessage !== undefined && params.model?.provider !== 'retell-llm';
+  if (firstMessageOnAgent) dto.begin_message = params.firstMessage;
   if (params.maxDurationSeconds !== undefined)
     dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
   if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
@@ -75,10 +151,7 @@ export function mapCreateAgentToRetell(
     };
   }
   if (params.model) {
-    dto.response_engine = {
-      type: params.model.provider,
-      llm_id: params.model.model,
-    };
+    dto.response_engine = mapModelConfigToRetellResponseEngine(params.model);
   }
   if (params.providerOptions) {
     Object.assign(dto, params.providerOptions);
@@ -92,7 +165,9 @@ export function mapUpdateAgentToRetell(
   const dto: Record<string, unknown> = {};
   if (params.name !== undefined) dto.agent_name = params.name;
   if (params.voice) dto.voice_id = params.voice.voiceId;
-  if (params.firstMessage !== undefined) dto.begin_message = params.firstMessage;
+  const firstMessageOnAgentUpdate =
+    params.firstMessage !== undefined && params.model?.provider !== 'retell-llm';
+  if (firstMessageOnAgentUpdate) dto.begin_message = params.firstMessage;
   if (params.maxDurationSeconds !== undefined)
     dto.max_call_duration_ms = params.maxDurationSeconds * 1000;
   if (params.backgroundSound !== undefined) dto.ambient_sound = params.backgroundSound;
@@ -108,10 +183,7 @@ export function mapUpdateAgentToRetell(
     };
   }
   if (params.model) {
-    dto.response_engine = {
-      type: params.model.provider,
-      llm_id: params.model.model,
-    };
+    dto.response_engine = mapModelConfigToRetellResponseEngine(params.model);
   }
   if (params.providerOptions) {
     Object.assign(dto, params.providerOptions);
@@ -171,6 +243,102 @@ export function mapCreateCallToRetell(params: CreateCallParams): Record<string, 
   if (params.providerOptions) {
     Object.assign(dto, params.providerOptions);
   }
+  return dto;
+}
+
+// ── Campaign ──
+
+function mapRetellBatchStatusToCampaignStatus(
+  status: string | undefined,
+): CampaignStatus {
+  switch (status) {
+    case 'draft':
+      return 'draft';
+    case 'queued':
+      return 'queued';
+    case 'scheduled':
+      return 'scheduled';
+    case 'in_progress':
+      return 'in-progress';
+    case 'ended':
+      return 'ended';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'unknown';
+  }
+}
+
+function toEpochMs(
+  value: number | string | undefined,
+): number | undefined {
+  if (value == null) return undefined;
+  const raw = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(raw)) return undefined;
+  // Retell surfaces seconds in some batch-call responses; normalize to ms.
+  return raw < 1_000_000_000_000 ? raw * 1000 : raw;
+}
+
+export function mapRetellBatchCallToCampaign(
+  batchCall: Record<string, unknown>,
+): Campaign {
+  const createdAtValue =
+    (batchCall.created_at as number | string | undefined) ??
+    (batchCall.create_time as number | string | undefined);
+  const scheduledTimestamp = ((batchCall.scheduled_timestamp as
+    | number
+    | string
+    | undefined) ??
+    (batchCall.trigger_timestamp as
+    | number
+    | string
+    | undefined));
+  const createdAtMs = toEpochMs(createdAtValue);
+  const scheduledAtMs = toEpochMs(scheduledTimestamp);
+
+  return {
+    id: batchCall.batch_call_id as string,
+    provider: PROVIDER,
+    name: batchCall.name as string | undefined,
+    agentId: batchCall.agent_id as string | undefined,
+    fromNumber: batchCall.from_number as string | undefined,
+    status: mapRetellBatchStatusToCampaignStatus(
+      batchCall.status as string | undefined,
+    ),
+    recipientCount: Number(
+      (batchCall.total_task_count as number | string | undefined) ??
+      (batchCall.total_tasks_count as number | string | undefined) ??
+      0,
+    ),
+    scheduledAt: scheduledAtMs != null ? new Date(scheduledAtMs) : undefined,
+    createdAt: createdAtMs != null ? new Date(createdAtMs) : undefined,
+    updatedAt: undefined,
+    metadata: batchCall.metadata as Record<string, unknown> | undefined,
+    raw: batchCall,
+  };
+}
+
+export function mapCreateCampaignToRetellBatchCall(
+  params: CreateCampaignParams,
+): Record<string, unknown> {
+  const dto: Record<string, unknown> = {
+    from_number: params.fromNumber,
+    tasks: params.tasks.map((task) => {
+      const mappedTask: Record<string, unknown> = {
+        to_number: task.toNumber,
+      };
+      if (task.metadata) mappedTask.metadata = task.metadata;
+      if (task.providerOptions) Object.assign(mappedTask, task.providerOptions);
+      return mappedTask;
+    }),
+  };
+
+  if (params.agentId) dto.agent_id = params.agentId;
+  if (params.scheduledAt != null && params.scheduledAt !== '') {
+    dto.trigger_timestamp = scheduledAtToTriggerTimestampMs(params.scheduledAt);
+  }
+  if (params.metadata) dto.metadata = params.metadata;
+  if (params.providerOptions) Object.assign(dto, params.providerOptions);
   return dto;
 }
 
@@ -235,6 +403,8 @@ function mapKnowledgeBaseSource(source: Record<string, unknown>): KnowledgeBaseS
     id: source.source_id as string,
     type: source.type as string,
     url: (source.url ?? source.file_url ?? source.content_url) as string | undefined,
+    title: source.title as string | undefined,
+    filename: source.filename as string | undefined,
   };
 }
 

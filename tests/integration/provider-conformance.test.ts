@@ -96,6 +96,13 @@ const retellFixture: ProviderFixture = {
       update: jest.fn(),
       delete: jest.fn(),
     };
+    const mockLlm = {
+      retrieve: jest.fn().mockResolvedValue({ llm_id: 'llm_1', begin_message: '' }),
+      update: jest.fn().mockResolvedValue({}),
+      create: jest.fn(),
+      list: jest.fn(),
+      delete: jest.fn(),
+    };
 
     const agent = {
       agent_id: 'agent_1',
@@ -133,6 +140,7 @@ const retellFixture: ProviderFixture = {
       agent: mockAgent,
       call: mockCall,
       phoneNumber: mockPhoneNumber,
+      llm: mockLlm,
     } as unknown as Retell));
 
     return createRetell({ apiKey: 'test-key' });

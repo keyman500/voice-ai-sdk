@@ -2,6 +2,7 @@ import Retell from 'retell-sdk';
 import type { VoiceProvider } from '../../core/provider.js';
 import { RetellAgentManager } from './retell-agent-manager.js';
 import { RetellCallManager } from './retell-call-manager.js';
+import { RetellCampaignManager } from './retell-campaign-manager.js';
 import { RetellPhoneNumberManager } from './retell-phone-number-manager.js';
 import { RetellKnowledgeBaseManager } from './retell-knowledge-base-manager.js';
 
@@ -16,6 +17,7 @@ export function createRetell(config: RetellConfig): VoiceProvider {
     providerId: 'retell',
     agents: new RetellAgentManager(client),
     calls: new RetellCallManager(client),
+    campaigns: new RetellCampaignManager(client),
     phoneNumbers: new RetellPhoneNumberManager(client),
     knowledgeBase: new RetellKnowledgeBaseManager(client),
   };
