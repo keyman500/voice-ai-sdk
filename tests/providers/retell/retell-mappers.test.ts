@@ -9,6 +9,7 @@ import {
   mapRetellPhoneNumber,
   mapRetellKnowledgeBase,
   mapCreateCampaignToRetellBatchCall,
+  mapRetellBatchCallToCampaign,
 } from '../../../src/providers/retell/retell-mappers';
 import { ProviderError } from '../../../src/core/errors';
 
@@ -40,6 +41,7 @@ describe('Retell Mappers', () => {
     it('handles custom-llm response engine', () => {
       const agent = mapRetellAgentToAgent({
         agent_id: 'a2',
+        begin_message: 'Hi from custom LLM',
         response_engine: {
           type: 'custom-llm',
           llm_websocket_url: 'wss://my-llm.example.com',
@@ -49,6 +51,7 @@ describe('Retell Mappers', () => {
         provider: 'custom-llm',
         model: 'wss://my-llm.example.com',
       });
+      expect(agent.firstMessage).toBe('Hi from custom LLM');
     });
 
     it('handles conversation-flow response engine', () => {
@@ -398,6 +401,39 @@ describe('Retell Mappers', () => {
           scheduledAt: 'not-a-date',
         }),
       ).toThrow(ProviderError);
+    });
+  });
+
+  describe('mapRetellBatchCallToCampaign', () => {
+    it('maps scheduled_timestamp and created_at from seconds to Date', () => {
+      const result = mapRetellBatchCallToCampaign({
+        batch_call_id: 'batch_1',
+        name: 'Campaign A',
+        agent_id: 'agent_1',
+        from_number: '+15559876543',
+        status: 'scheduled',
+        total_task_count: 2,
+        scheduled_timestamp: 1_735_718_400,
+        created_at: 1_735_714_800,
+      });
+
+      expect(result.id).toBe('batch_1');
+      expect(result.recipientCount).toBe(2);
+      expect(result.scheduledAt).toEqual(new Date(1_735_718_400_000));
+      expect(result.createdAt).toEqual(new Date(1_735_714_800_000));
+    });
+
+    it('supports legacy trigger_timestamp and total_tasks_count fields', () => {
+      const result = mapRetellBatchCallToCampaign({
+        batch_call_id: 'batch_legacy',
+        total_tasks_count: 3,
+        trigger_timestamp: 1_700_049_600_000,
+        create_time: 1_700_040_000_000,
+      });
+
+      expect(result.recipientCount).toBe(3);
+      expect(result.scheduledAt).toEqual(new Date(1_700_049_600_000));
+      expect(result.createdAt).toEqual(new Date(1_700_040_000_000));
     });
   });
 

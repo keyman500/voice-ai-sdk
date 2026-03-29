@@ -108,6 +108,10 @@ export function mapModelConfigToRetellResponseEngine(model: ModelConfig): Record
 }
 
 export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
+  const responseEngine = agent.response_engine as Record<string, unknown> | undefined;
+  const isRetellLlm = responseEngine?.type === 'retell-llm';
+  const beginMessage = agent.begin_message as string | undefined;
+
   return {
     id: agent.agent_id as string,
     provider: PROVIDER,
@@ -115,9 +119,9 @@ export function mapRetellAgentToAgent(agent: Record<string, unknown>): Agent {
     voice: agent.voice_id
       ? { voiceId: agent.voice_id as string }
       : undefined,
-    model: mapModelFromRetell(agent.response_engine as Record<string, unknown> | undefined),
+    model: mapModelFromRetell(responseEngine),
     // For retell-llm, begin_message lives on the LLM resource; RetellAgentManager hydrates via llm.retrieve.
-    firstMessage: undefined,
+    firstMessage: !isRetellLlm && beginMessage ? beginMessage : undefined,
     metadata: undefined,
     raw: agent,
   };
@@ -265,16 +269,32 @@ function mapRetellBatchStatusToCampaignStatus(
   }
 }
 
+function toEpochMs(
+  value: number | string | undefined,
+): number | undefined {
+  if (value == null) return undefined;
+  const raw = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(raw)) return undefined;
+  // Retell surfaces seconds in some batch-call responses; normalize to ms.
+  return raw < 1_000_000_000_000 ? raw * 1000 : raw;
+}
+
 export function mapRetellBatchCallToCampaign(
   batchCall: Record<string, unknown>,
 ): Campaign {
   const createdAtValue =
     (batchCall.created_at as number | string | undefined) ??
     (batchCall.create_time as number | string | undefined);
-  const triggerTimestamp = batchCall.trigger_timestamp as
+  const scheduledTimestamp = ((batchCall.scheduled_timestamp as
     | number
     | string
-    | undefined;
+    | undefined) ??
+    (batchCall.trigger_timestamp as
+    | number
+    | string
+    | undefined));
+  const createdAtMs = toEpochMs(createdAtValue);
+  const scheduledAtMs = toEpochMs(scheduledTimestamp);
 
   return {
     id: batchCall.batch_call_id as string,
@@ -285,9 +305,13 @@ export function mapRetellBatchCallToCampaign(
     status: mapRetellBatchStatusToCampaignStatus(
       batchCall.status as string | undefined,
     ),
-    recipientCount: Number(batchCall.total_tasks_count ?? 0),
-    scheduledAt: triggerTimestamp ? new Date(triggerTimestamp) : undefined,
-    createdAt: createdAtValue ? new Date(createdAtValue) : undefined,
+    recipientCount: Number(
+      (batchCall.total_task_count as number | string | undefined) ??
+      (batchCall.total_tasks_count as number | string | undefined) ??
+      0,
+    ),
+    scheduledAt: scheduledAtMs != null ? new Date(scheduledAtMs) : undefined,
+    createdAt: createdAtMs != null ? new Date(createdAtMs) : undefined,
     updatedAt: undefined,
     metadata: batchCall.metadata as Record<string, unknown> | undefined,
     raw: batchCall,
