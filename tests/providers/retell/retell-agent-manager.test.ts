@@ -154,6 +154,19 @@ describe('RetellAgentManager', () => {
       expect(mockLlm.retrieve).toHaveBeenCalledWith('llm_1');
     });
 
+    it('hydrates knowledgeBaseIds from llm.retrieve', async () => {
+      mockAgent.retrieve.mockResolvedValue(sampleAgent);
+      mockLlm.retrieve.mockResolvedValue({
+        llm_id: 'llm_1',
+        begin_message: 'Hi',
+        knowledge_base_ids: ['kb_a', 'kb_b'],
+      });
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      const agent = await provider.agents.get('agent_1');
+      expect(agent.model?.knowledgeBaseIds).toEqual(['kb_a', 'kb_b']);
+    });
+
     it('does not call llm.retrieve for custom-llm agents', async () => {
       mockAgent.retrieve.mockResolvedValue({
         ...sampleAgent,

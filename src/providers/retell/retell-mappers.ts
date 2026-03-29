@@ -8,6 +8,9 @@ import type {
   CreateAgentParams,
   UpdateAgentParams,
   CreateCallParams,
+  Campaign,
+  CampaignStatus,
+  CreateCampaignParams,
   CreatePhoneNumberParams,
   UpdatePhoneNumberParams,
   ModelConfig,
@@ -219,6 +222,80 @@ export function mapCreateCallToRetell(params: CreateCallParams): Record<string, 
   return dto;
 }
 
+// ── Campaign ──
+
+function mapRetellBatchStatusToCampaignStatus(
+  status: string | undefined,
+): CampaignStatus {
+  switch (status) {
+    case 'draft':
+      return 'draft';
+    case 'queued':
+      return 'queued';
+    case 'scheduled':
+      return 'scheduled';
+    case 'in_progress':
+      return 'in-progress';
+    case 'ended':
+      return 'ended';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'unknown';
+  }
+}
+
+export function mapRetellBatchCallToCampaign(
+  batchCall: Record<string, unknown>,
+): Campaign {
+  const createdAtValue =
+    (batchCall.created_at as number | string | undefined) ??
+    (batchCall.create_time as number | string | undefined);
+  const triggerTimestamp = batchCall.trigger_timestamp as
+    | number
+    | string
+    | undefined;
+
+  return {
+    id: batchCall.batch_call_id as string,
+    provider: PROVIDER,
+    name: batchCall.name as string | undefined,
+    agentId: batchCall.agent_id as string | undefined,
+    fromNumber: batchCall.from_number as string | undefined,
+    status: mapRetellBatchStatusToCampaignStatus(
+      batchCall.status as string | undefined,
+    ),
+    recipientCount: Number(batchCall.total_tasks_count ?? 0),
+    scheduledAt: triggerTimestamp ? new Date(triggerTimestamp) : undefined,
+    createdAt: createdAtValue ? new Date(createdAtValue) : undefined,
+    updatedAt: undefined,
+    metadata: batchCall.metadata as Record<string, unknown> | undefined,
+    raw: batchCall,
+  };
+}
+
+export function mapCreateCampaignToRetellBatchCall(
+  params: CreateCampaignParams,
+): Record<string, unknown> {
+  const dto: Record<string, unknown> = {
+    from_number: params.fromNumber,
+    tasks: params.tasks.map((task) => {
+      const mappedTask: Record<string, unknown> = {
+        to_number: task.toNumber,
+      };
+      if (task.metadata) mappedTask.metadata = task.metadata;
+      if (task.providerOptions) Object.assign(mappedTask, task.providerOptions);
+      return mappedTask;
+    }),
+  };
+
+  if (params.agentId) dto.agent_id = params.agentId;
+  if (params.scheduledAt) dto.trigger_timestamp = params.scheduledAt;
+  if (params.metadata) dto.metadata = params.metadata;
+  if (params.providerOptions) Object.assign(dto, params.providerOptions);
+  return dto;
+}
+
 // ── Phone Number ──
 
 export function mapCreatePhoneNumberToRetell(
@@ -280,6 +357,8 @@ function mapKnowledgeBaseSource(source: Record<string, unknown>): KnowledgeBaseS
     id: source.source_id as string,
     type: source.type as string,
     url: (source.url ?? source.file_url ?? source.content_url) as string | undefined,
+    title: source.title as string | undefined,
+    filename: source.filename as string | undefined,
   };
 }
 

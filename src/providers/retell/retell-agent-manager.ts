@@ -139,11 +139,17 @@ export class RetellAgentManager implements AgentManager {
       const llmRec = llm as unknown as Record<string, unknown>;
       const begin = llmRec.begin_message as string | undefined;
       const general = llmRec.general_prompt as string | undefined;
+      const rawKbIds = llmRec.knowledge_base_ids as string[] | null | undefined;
+      const knowledgeBaseIds = rawKbIds?.filter((id): id is string => Boolean(id)) ?? [];
       return {
         ...agent,
         firstMessage: begin,
         model: agent.model
-          ? { ...agent.model, systemPrompt: general ?? agent.model.systemPrompt }
+          ? {
+              ...agent.model,
+              systemPrompt: general ?? agent.model.systemPrompt,
+              knowledgeBaseIds,
+            }
           : undefined,
       };
     } catch (err) {

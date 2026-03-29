@@ -33,6 +33,8 @@ const sampleKnowledgeBase = {
 
 let mockKnowledgeBase: Record<string, jest.Mock>;
 
+let mockLlm: { retrieve: jest.Mock; update: jest.Mock };
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockKnowledgeBase = {
@@ -40,9 +42,19 @@ beforeEach(() => {
     list: jest.fn(),
     retrieve: jest.fn(),
     delete: jest.fn(),
+    addSources: jest.fn(),
+    deleteSource: jest.fn(),
+  };
+  mockLlm = {
+    retrieve: jest.fn().mockResolvedValue({
+      llm_id: 'llm_1',
+      knowledge_base_ids: ['kb_existing'],
+    }),
+    update: jest.fn().mockResolvedValue({}),
   };
   MockedRetell.mockImplementation(() => ({
     knowledgeBase: mockKnowledgeBase,
+    llm: mockLlm,
   } as unknown as Retell));
 });
 
@@ -63,6 +75,44 @@ describe('RetellKnowledgeBaseManager', () => {
       expect(kb.sources).toHaveLength(3);
       expect(mockKnowledgeBase.create).toHaveBeenCalledWith(
         expect.objectContaining({ knowledge_base_name: 'Product FAQ' }),
+      );
+    });
+
+    it('truncates knowledge_base_name to 39 characters for Retell API limit', async () => {
+      mockKnowledgeBase.create.mockResolvedValue({
+        ...sampleKnowledgeBase,
+        knowledge_base_name: 'x'.repeat(39),
+      });
+      const provider = createRetell({ apiKey: 'test-key' });
+      const longName = 'R'.repeat(60);
+
+      await provider.knowledgeBase!.create({ name: longName });
+
+      expect(mockKnowledgeBase.create).toHaveBeenCalledWith(
+        expect.objectContaining({ knowledge_base_name: 'R'.repeat(39) }),
+      );
+    });
+
+    it('accepts initial source payload in providerOptions', async () => {
+      mockKnowledgeBase.create.mockResolvedValue(sampleKnowledgeBase);
+      const provider = createRetell({ apiKey: 'test-key' });
+
+      await provider.knowledgeBase!.create({
+        name: 'KB With Source',
+        providerOptions: {
+          urls: ['https://example.com/start'],
+          texts: [{ title: 'Intro', text: 'hello' }],
+          files: [Buffer.from('seed')],
+        },
+      });
+
+      expect(mockKnowledgeBase.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          knowledge_base_name: 'KB With Source',
+          knowledge_base_urls: ['https://example.com/start'],
+          knowledge_base_texts: [{ title: 'Intro', text: 'hello' }],
+          knowledge_base_files: [expect.any(Buffer)],
+        }),
       );
     });
 
@@ -142,6 +192,86 @@ describe('RetellKnowledgeBaseManager', () => {
       const provider = createRetell({ apiKey: 'test-key' });
 
       await expect(provider.knowledgeBase!.delete('kb_missing')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('addSources (Retell-only)', () => {
+    it('calls Retell addSources and returns unified KnowledgeBase', async () => {
+      mockKnowledgeBase.addSources.mockResolvedValue(sampleKnowledgeBase);
+      const provider = createRetell({ apiKey: 'test-key' });
+      const kb = await (provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager).addSources(
+        'kb_1',
+        {
+          urls: ['https://example.com/doc'],
+          texts: [{ title: 'Note', text: 'Hello' }],
+          files: [Buffer.from('x')],
+        },
+      );
+      expect(kb.id).toBe('kb_1');
+      expect(mockKnowledgeBase.addSources).toHaveBeenCalledWith(
+        'kb_1',
+        expect.objectContaining({
+          knowledge_base_urls: ['https://example.com/doc'],
+          knowledge_base_texts: [{ title: 'Note', text: 'Hello' }],
+          knowledge_base_files: [expect.any(Buffer)],
+        }),
+      );
+    });
+
+    it('wraps 401 as AuthenticationError', async () => {
+      mockKnowledgeBase.addSources.mockRejectedValue(
+        Object.assign(new Error('unauthorized'), { status: 401 }),
+      );
+      const provider = createRetell({ apiKey: 'test-key' });
+      const mgr = provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager;
+      await expect(
+        mgr.addSources('kb_1', { urls: ['https://a.com'] }),
+      ).rejects.toThrow(AuthenticationError);
+    });
+  });
+
+  describe('deleteSource (Retell-only)', () => {
+    it('calls Retell deleteSource and returns unified KnowledgeBase', async () => {
+      mockKnowledgeBase.deleteSource.mockResolvedValue(sampleKnowledgeBase);
+      const provider = createRetell({ apiKey: 'test-key' });
+      const mgr = provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager;
+      const kb = await mgr.deleteSource('kb_1', 'src_1');
+      expect(kb.sources).toHaveLength(3);
+      expect(mockKnowledgeBase.deleteSource).toHaveBeenCalledWith('kb_1', 'src_1');
+    });
+
+    it('throws NotFoundError on 404', async () => {
+      mockKnowledgeBase.deleteSource.mockRejectedValue(
+        Object.assign(new Error('not found'), { status: 404 }),
+      );
+      const provider = createRetell({ apiKey: 'test-key' });
+      const mgr = provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager;
+      await expect(mgr.deleteSource('kb_x', 'src_x')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('attachToRetellLlm / detachFromRetellLlm (Retell-only)', () => {
+    it('merges knowledge_base_ids on attach', async () => {
+      const provider = createRetell({ apiKey: 'test-key' });
+      const mgr = provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager;
+      await mgr.attachToRetellLlm('llm_1', 'kb_new');
+      expect(mockLlm.retrieve).toHaveBeenCalledWith('llm_1');
+      expect(mockLlm.update).toHaveBeenCalledWith('llm_1', {
+        knowledge_base_ids: ['kb_existing', 'kb_new'],
+      });
+    });
+
+    it('removes id on detach', async () => {
+      mockLlm.retrieve.mockResolvedValue({
+        llm_id: 'llm_1',
+        knowledge_base_ids: ['kb_a', 'kb_b'],
+      });
+      const provider = createRetell({ apiKey: 'test-key' });
+      const mgr = provider.knowledgeBase as import('../../../src/providers/retell/retell-knowledge-base-manager').RetellKnowledgeBaseManager;
+      await mgr.detachFromRetellLlm('llm_1', 'kb_a');
+      expect(mockLlm.update).toHaveBeenCalledWith('llm_1', {
+        knowledge_base_ids: ['kb_b'],
+      });
     });
   });
 });

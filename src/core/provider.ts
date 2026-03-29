@@ -11,6 +11,10 @@ import type {
   CreateCallParams,
   UpdateCallParams,
   ListCallsParams,
+  Campaign,
+  CreateCampaignParams,
+  UpdateCampaignParams,
+  ListCampaignsParams,
   ListPhoneNumbersParams,
   CreatePhoneNumberParams,
   UpdatePhoneNumberParams,
@@ -38,6 +42,14 @@ export interface CallManager {
   list(params?: ListCallsParams): Promise<PaginatedList<Call>>;
   get(id: string): Promise<Call>;
   update(id: string, params: UpdateCallParams): Promise<Call>;
+  delete(id: string): Promise<void>;
+}
+
+export interface CampaignManager {
+  create(params: CreateCampaignParams): Promise<Campaign>;
+  list(params?: ListCampaignsParams): Promise<PaginatedList<Campaign>>;
+  get(id: string): Promise<Campaign>;
+  update(id: string, params: UpdateCampaignParams): Promise<Campaign>;
   delete(id: string): Promise<void>;
 }
 
@@ -76,6 +88,7 @@ export interface VoiceProvider {
   readonly providerId: string;
   readonly agents: AgentManager;
   readonly calls: CallManager;
+  readonly campaigns?: CampaignManager;
   readonly phoneNumbers: PhoneNumberManager;
   readonly tools?: ToolManager;
   readonly files?: FileManager;

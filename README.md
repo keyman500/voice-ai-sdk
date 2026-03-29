@@ -173,7 +173,23 @@ const kb = await provider.knowledgeBase!.create({ name: 'FAQ' });
 const { items } = await provider.knowledgeBase!.list();
 const kb = await provider.knowledgeBase!.get('kb-id');
 await provider.knowledgeBase!.delete('kb-id');
+
+// Retell-only: add / remove sources (URLs, text snippets, files)
+import type { RetellKnowledgeBaseManager } from 'voice-ai-sdk';
+const kbManager = provider.knowledgeBase as RetellKnowledgeBaseManager;
+await kbManager.addSources('kb-id', {
+  urls: ['https://example.com/docs'],
+  texts: [{ title: 'Policy', text: 'Our refund policy is...' }],
+  files: [fileBufferOrUploadable],
+});
+await kbManager.deleteSource('kb-id', 'source-id');
+
+// Attach a knowledge base to a Retell LLM (merges with existing knowledge_base_ids)
+await kbManager.attachToRetellLlm('llm-id', 'kb-id');
+await kbManager.detachFromRetellLlm('llm-id', 'kb-id');
 ```
+
+`Agent.model.knowledgeBaseIds` is populated when hydrating a `retell-llm` agent via `agents.get` / `list` (from `llm.retrieve`).
 
 ## Pagination
 
