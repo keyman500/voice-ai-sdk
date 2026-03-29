@@ -156,7 +156,7 @@ export interface CreateCampaignParams {
   agentId?: string;
   fromNumber: string;
   tasks: CampaignTask[];
-  scheduledAt?: string;
+  scheduledAt?: Date | string | number;
   metadata?: Record<string, unknown>;
   providerOptions?: Record<string, unknown>;
 }
@@ -164,7 +164,7 @@ export interface CreateCampaignParams {
 export interface UpdateCampaignParams {
   name?: string;
   status?: CampaignStatus;
-  scheduledAt?: string;
+  scheduledAt?: Date | string | number;
   metadata?: Record<string, unknown>;
   providerOptions?: Record<string, unknown>;
 }

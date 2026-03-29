@@ -8,6 +8,7 @@ import {
   mapUpdatePhoneNumberToRetell,
   mapRetellPhoneNumber,
   mapRetellKnowledgeBase,
+  mapCreateCampaignToRetellBatchCall,
 } from '../../../src/providers/retell/retell-mappers';
 import { ProviderError } from '../../../src/core/errors';
 
@@ -351,6 +352,52 @@ describe('Retell Mappers', () => {
       expect(result.name).toBe('Main Line');
       expect(result.agentId).toBe('agent_1');
       expect(result.raw).toBe(pn);
+    });
+  });
+
+  describe('mapCreateCampaignToRetellBatchCall', () => {
+    const base = {
+      fromNumber: '+15559876543',
+      tasks: [{ toNumber: '+15551234567' }],
+    };
+
+    it('sets trigger_timestamp to Unix ms from ISO string', () => {
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: '2023-11-15T12:00:00.000Z',
+      });
+      expect(result.trigger_timestamp).toBe(1_700_049_600_000);
+    });
+
+    it('sets trigger_timestamp from Date', () => {
+      const d = new Date('2023-11-15T12:00:00.000Z');
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: d,
+      });
+      expect(result.trigger_timestamp).toBe(d.getTime());
+    });
+
+    it('sets trigger_timestamp from numeric Unix ms', () => {
+      const result = mapCreateCampaignToRetellBatchCall({
+        ...base,
+        scheduledAt: 1_700_049_600_000,
+      });
+      expect(result.trigger_timestamp).toBe(1_700_049_600_000);
+    });
+
+    it('omits trigger_timestamp when scheduledAt is undefined', () => {
+      const result = mapCreateCampaignToRetellBatchCall(base);
+      expect(result.trigger_timestamp).toBeUndefined();
+    });
+
+    it('throws ProviderError when scheduledAt string is not parseable', () => {
+      expect(() =>
+        mapCreateCampaignToRetellBatchCall({
+          ...base,
+          scheduledAt: 'not-a-date',
+        }),
+      ).toThrow(ProviderError);
     });
   });
 

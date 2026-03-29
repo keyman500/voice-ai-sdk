@@ -8,6 +8,7 @@ const MockedRetell = Retell as jest.MockedClass<typeof Retell>;
 
 const sampleBatchCall = {
   batch_call_id: 'batch_1',
+  agent_id: 'agent_1',
   from_number: '+15559876543',
   total_tasks_count: 2,
   created_at: 1700000000000,

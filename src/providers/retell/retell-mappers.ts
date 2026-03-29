@@ -19,6 +19,26 @@ import { ProviderError } from '../../core/errors.js';
 
 const PROVIDER = 'retell';
 
+function scheduledAtToTriggerTimestampMs(
+  scheduledAt: Date | string | number,
+): number {
+  let ms: number;
+  if (scheduledAt instanceof Date) {
+    ms = scheduledAt.getTime();
+  } else if (typeof scheduledAt === 'number') {
+    ms = Number(scheduledAt);
+  } else {
+    ms = Date.parse(scheduledAt);
+  }
+  if (!Number.isFinite(ms)) {
+    throw new ProviderError(
+      'retell',
+      'Invalid scheduledAt: expected a Date, Unix millisecond timestamp, or parseable date string',
+    );
+  }
+  return Math.trunc(ms);
+}
+
 // ── Agent ──
 
 function mapModelFromRetell(
@@ -290,7 +310,9 @@ export function mapCreateCampaignToRetellBatchCall(
   };
 
   if (params.agentId) dto.agent_id = params.agentId;
-  if (params.scheduledAt) dto.trigger_timestamp = params.scheduledAt;
+  if (params.scheduledAt != null && params.scheduledAt !== '') {
+    dto.trigger_timestamp = scheduledAtToTriggerTimestampMs(params.scheduledAt);
+  }
   if (params.metadata) dto.metadata = params.metadata;
   if (params.providerOptions) Object.assign(dto, params.providerOptions);
   return dto;
